@@ -163,6 +163,9 @@ try:
     check("the search field has focus", state["firstResponder"] == "NSTextView", state["firstResponder"])
     check("clips load newest first", state["clipCount"] == total and state["previews"][0].startswith("text: Buy oat"), state["previews"])
     screenshot("shelf", 1000)
+    ctl("hover", 190, 210)
+    screenshot("shelf-hover", 1000)
+    ctl("hover")
 
     drag_image = work / "drag.png"
     ctl("drag-preview", drag_image)

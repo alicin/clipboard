@@ -168,7 +168,9 @@ private extension View {
 }
 
 struct ClipCard: View {
-    static let selectedScale: CGFloat = 1.07
+    // Whole-point sizes: an edge on a fraction of a pixel draws a stray line of the card's color past its rounded corners.
+    static let selectedScale = CGSize(width: 244 / Metrics.cardWidth, height: 268 / Metrics.cardHeight)
+    private static let hoverScale = CGSize(width: 230 / Metrics.cardWidth, height: 252 / Metrics.cardHeight)
 
     let clip: Clip
     let index: Int
@@ -194,7 +196,7 @@ struct ClipCard: View {
 
     private var effectiveHover: CGPoint? {
         #if DEBUG
-        if AppEnvironment.isDemo {
+        if AppEnvironment.isUITest {
             return DemoControl.shared.hover?.clipID == clip.id ? DemoControl.shared.hover?.point : nil
         }
         #endif
@@ -205,7 +207,8 @@ struct ClipCard: View {
     private var isFlying: Bool { model.flyingClipID == clip.id }
 
     private var tilt: (x: Double, y: Double) {
-        guard let hoverPoint = effectiveHover, !Motion.isReduced else { return (0, 0) }
+        // The glow behind a selected card stays still, so a tilting card would pull away from it and expose its inner edge.
+        guard let hoverPoint = effectiveHover, !isSelected, !Motion.isReduced else { return (0, 0) }
         let x = (hoverPoint.x / Metrics.cardWidth - 0.5) * 2
         let y = (hoverPoint.y / Metrics.cardHeight - 0.5) * 2
         return (Double(-y) * 3.5, Double(x) * 3.5)
@@ -217,8 +220,9 @@ struct ClipCard: View {
             .background(Theme.cardPaper)
             .clipShape(shape)
             .overlay { shape.strokeBorder(.primary.opacity(0.08), lineWidth: 0.5) }
-            .overlay { shape.strokeBorder(Theme.accent, lineWidth: 1.5).opacity(isSelected ? 1 : 0) }
             .overlay { shine }
+            // Centered on the edge, to cover the soft pixels where the paper would otherwise show around the outside.
+            .overlay { shape.stroke(Theme.accent, lineWidth: 1.5).opacity(isSelected ? 1 : 0) }
             .overlay(alignment: .bottomTrailing) { hoverActions }
             .contentShape(.dragPreview, shape)
             .contentShape(shape)
@@ -240,7 +244,7 @@ struct ClipCard: View {
                     }
                 }
             }
-            .scaleEffect(isSelected ? Self.selectedScale : (isHovering ? 1.012 : 1))
+            .scaleEffect(isSelected ? Self.selectedScale : (isHovering ? Self.hoverScale : CGSize(width: 1, height: 1)))
             .shadow(color: .black.opacity(isSelected ? 0 : 0.15), radius: 7, y: 3)
             .animation(Motion.bouncy, value: isSelected)
             .scaleEffect(isFlying ? 1.07 : (hasAppeared ? 1 : 0.92))
@@ -282,7 +286,8 @@ struct ClipCard: View {
                 actionButton("trash", label: "Delete") { model.delete(clip) }
             }
             .padding(2)
-            .background(.regularMaterial, in: Capsule())
+            // Not a material: one nested inside the shelf's glass thins the glass's blur for as long as it's on screen.
+            .background(Theme.cardPaper, in: Capsule())
             .overlay { Capsule().strokeBorder(.primary.opacity(0.08), lineWidth: 0.5) }
             .shadow(color: .black.opacity(0.14), radius: 4, y: 2)
             .padding(5)

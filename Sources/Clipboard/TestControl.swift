@@ -52,6 +52,7 @@ final class TestControl {
         case "pin": pinSelected(toBoardNamed: arguments)
         case "stack-next": stack.advance()
         case "pause": Preferences.shared.isPaused = arguments == "on"
+        case "hover": hoverCard(arguments)
         case "hotkey": sendHotKey(id: arguments == "stack" ? HotKeyID.stack : HotKeyID.open)
         case "rename-clip": if let clip = panel.model.selectedClip { panel.model.beginRename(clip) }
         case "rename-board": if let board = panel.model.pinboards.first(where: { $0.name == arguments }) { panel.model.beginRename(board) }
@@ -174,6 +175,18 @@ final class TestControl {
         else { return }
         view.cacheDisplay(in: view.bounds, to: rep)
         try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: parts[2]))
+    }
+
+    /// `x y [index]`, in points from the top-left corner of the card at `index` or the selected one. Anything else stops hovering.
+    private func hoverCard(_ arguments: String) {
+        let parts = arguments.split(separator: " ").compactMap { Double($0) }
+        let clips = panel.model.clips
+        let clip = parts.count > 2 ? clips.dropFirst(Int(parts[2])).first : panel.model.selectedClip
+        guard parts.count >= 2, let clip else {
+            DemoControl.shared.hover = nil
+            return
+        }
+        DemoControl.shared.hover = DemoControl.Hover(clipID: clip.id, point: CGPoint(x: parts[0], y: parts[1]))
     }
 
     private func pinSelected(toBoardNamed name: String) {
