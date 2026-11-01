@@ -50,6 +50,7 @@ public struct ClipDraft: Sendable {
     public let pixelWidth: Int?
     public let pixelHeight: Int?
     public let thumbnail: Data?
+    public let isSecret: Bool
 }
 
 public enum BuildResult: Sendable {
@@ -68,7 +69,7 @@ public enum ClipBuilder {
     ]
     private static let thumbnailPixels = 720
 
-    public static func build(items rawItems: [[Representation]], source: ClipSource, skipSecrets: Bool) -> BuildResult {
+    public static func build(items rawItems: [[Representation]], source: ClipSource, secrets: SecretHandling) -> BuildResult {
         let items = rawItems
             .map { $0.filter { PasteboardMarkers.shouldStore(uti: $0.uti, byteCount: $0.data.count) } }
             .filter { !$0.isEmpty }
@@ -83,7 +84,8 @@ public enum ClipBuilder {
 
         let text = items.compactMap(plainText(from:)).joined(separator: "\n")
         let hasText = !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-        if hasText, skipSecrets, SecretDetector.containsSecret(text) { return .skippedSecret }
+        let isSecret = hasText && SecretDetector.containsSecret(text)
+        if isSecret, secrets == .skip { return .skippedSecret }
 
         let textKind = hasText ? ClipClassifier.classify(text: text, sourceBundleID: source.bundleID) : nil
         // Browsers put the image's URL next to its bytes on "Copy Image", which is still an image copy.
@@ -95,11 +97,14 @@ public enum ClipBuilder {
                 draft(
                     .image, text: hasText ? text : nil, items: items, identity: "image:" + digest, source: source,
                     byteSize: byteSize, pixelWidth: thumbnail.width, pixelHeight: thumbnail.height,
-                    thumbnail: thumbnail.png))
+                    thumbnail: thumbnail.png, isSecret: isSecret))
         }
 
         if let textKind {
-            return .clip(draft(textKind, text: text, items: items, identity: "text:" + text, source: source, byteSize: byteSize))
+            return .clip(
+                draft(
+                    textKind, text: text, items: items, identity: "text:" + text, source: source, byteSize: byteSize,
+                    isSecret: isSecret))
         }
 
         // Only app-private or empty-string types. Whitespace alone never produces a useful card.
@@ -114,12 +119,12 @@ public enum ClipBuilder {
 
     private static func draft(
         _ kind: ClipKind, text: String?, items: [[Representation]], identity: String, source: ClipSource,
-        byteSize: Int64, pixelWidth: Int? = nil, pixelHeight: Int? = nil, thumbnail: Data? = nil
+        byteSize: Int64, pixelWidth: Int? = nil, pixelHeight: Int? = nil, thumbnail: Data? = nil, isSecret: Bool = false
     ) -> ClipDraft {
         let hash = SHA256.hash(data: Data(identity.utf8)).map { String(format: "%02x", $0) }.joined()
         return ClipDraft(
             kind: kind, text: text, items: items, hash: hash, source: source, byteSize: byteSize,
-            pixelWidth: pixelWidth, pixelHeight: pixelHeight, thumbnail: thumbnail)
+            pixelWidth: pixelWidth, pixelHeight: pixelHeight, thumbnail: thumbnail, isSecret: isSecret)
     }
 
     static func filePaths(from items: [[Representation]]) -> [String] {

@@ -89,7 +89,7 @@ final class ClipboardMonitor {
         let source = ClipSource(bundleID: front?.bundleIdentifier, name: front?.localizedName)
         let ignored = Set(preferences.ignoredBundleIDs)
         if let bundleID = source.bundleID, ignored.contains(bundleID) { return }
-        let skipSecrets = preferences.skipSecrets
+        let secrets = preferences.secretHandling
         let store = store
 
         // Reads go off the main thread: they can force the source app to render lazily provided
@@ -97,7 +97,7 @@ final class ClipboardMonitor {
         queue.async { [weak self] in
             guard let capture = Self.read(expectedChange: change, frontmost: source) else { return }
             if let bundleID = capture.source.bundleID, ignored.contains(bundleID) { return }
-            let built = ClipBuilder.build(items: capture.items, source: capture.source, skipSecrets: skipSecrets)
+            let built = ClipBuilder.build(items: capture.items, source: capture.source, secrets: secrets)
             guard case .clip(let draft) = built, let result = try? store.capture(draft) else { return }
             DispatchQueue.main.async {
                 self?.onCapture?(result)

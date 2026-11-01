@@ -1,4 +1,5 @@
 import AppKit
+import ClipboardCore
 import Observation
 
 /// Debug builds started by scripts/ui_test.py keep away from the user's real clipboard, preferences and hotkeys.
@@ -55,7 +56,8 @@ final class Preferences {
 
     private enum Key {
         static let plainText = "plainTextByDefault"
-        static let skipSecrets = "skipSecrets"
+        static let secretHandling = "secretHandling"
+        static let legacySkipSecrets = "skipSecrets"
         static let linkPreviews = "linkPreviews"
         static let retentionDays = "retentionDays"
         static let ignoredApps = "ignoredBundleIDs"
@@ -70,9 +72,15 @@ final class Preferences {
     @ObservationIgnored var onShortcutsChanged: (() -> Void)?
     @ObservationIgnored var onRetentionChanged: (() -> Void)?
     @ObservationIgnored var onPausedChanged: (() -> Void)?
+    @ObservationIgnored var onSecretHandlingChanged: (() -> Void)?
 
     var plainTextByDefault: Bool { didSet { defaults.set(plainTextByDefault, forKey: Key.plainText) } }
-    var skipSecrets: Bool { didSet { defaults.set(skipSecrets, forKey: Key.skipSecrets) } }
+    var secretHandling: SecretHandling {
+        didSet {
+            defaults.set(secretHandling.rawValue, forKey: Key.secretHandling)
+            onSecretHandlingChanged?()
+        }
+    }
     var linkPreviews: Bool { didSet { defaults.set(linkPreviews, forKey: Key.linkPreviews) } }
     var retentionDays: Int {
         didSet {
@@ -110,9 +118,11 @@ final class Preferences {
 
     private init() {
         let defaults = AppEnvironment.defaults
-        defaults.register(defaults: [Key.skipSecrets: true])
         plainTextByDefault = defaults.bool(forKey: Key.plainText)
-        skipSecrets = defaults.bool(forKey: Key.skipSecrets)
+        // Someone who turned off the old on/off switch was saving these in the clear.
+        let keptSecrets = defaults.object(forKey: Key.legacySkipSecrets) as? Bool == false
+        secretHandling = defaults.string(forKey: Key.secretHandling).flatMap(SecretHandling.init(rawValue:))
+            ?? (keptSecrets ? .show : .skip)
         linkPreviews = defaults.bool(forKey: Key.linkPreviews)
         retentionDays = defaults.integer(forKey: Key.retentionDays)
         ignoredBundleIDs = defaults.stringArray(forKey: Key.ignoredApps) ?? Self.defaultIgnoredApps

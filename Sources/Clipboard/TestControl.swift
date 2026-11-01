@@ -52,6 +52,7 @@ final class TestControl {
         case "pin": pinSelected(toBoardNamed: arguments)
         case "stack-next": stack.advance()
         case "pause": Preferences.shared.isPaused = arguments == "on"
+        case "secrets": Preferences.shared.secretHandling = SecretHandling(rawValue: arguments) ?? .skip
         case "hover": hoverCard(arguments)
         case "hotkey": sendHotKey(id: arguments == "stack" ? HotKeyID.stack : HotKeyID.open)
         case "rename-clip": if let clip = panel.model.selectedClip { panel.model.beginRename(clip) }

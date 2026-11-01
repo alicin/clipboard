@@ -20,9 +20,9 @@ func samplePNG(width: Int = 20, height: Int = 10) -> Data {
     return rep.representation(using: .png, properties: [:])!
 }
 
-func draft(from items: [[Representation]], skipSecrets: Bool = true, app: String? = "com.example.app") -> ClipDraft? {
+func draft(from items: [[Representation]], secrets: SecretHandling = .skip, app: String? = "com.example.app") -> ClipDraft? {
     if case .clip(let draft) = ClipBuilder.build(
-        items: items, source: ClipSource(bundleID: app, name: "Example"), skipSecrets: skipSecrets) {
+        items: items, source: ClipSource(bundleID: app, name: "Example"), secrets: secrets) {
         return draft
     }
     return nil
@@ -90,18 +90,33 @@ func draft(from items: [[Representation]], skipSecrets: Bool = true, app: String
         #expect(draft(from: items)?.kind == .image)
     }
 
-    @Test func secretsAreSkippedOnlyWhenAsked() {
+    @Test func secretsAreSkippedOnlyWhenAsked() throws {
         let items = [[utf8Rep("token ghp_abcdefghijklmnopqrstuvwxyz0123456789")]]
-        guard case .skippedSecret = ClipBuilder.build(items: items, source: ClipSource(bundleID: nil, name: nil), skipSecrets: true) else {
+        guard case .skippedSecret = ClipBuilder.build(items: items, source: ClipSource(bundleID: nil, name: nil), secrets: .skip) else {
             Issue.record("expected the secret to be skipped")
             return
         }
-        #expect(draft(from: items, skipSecrets: false) != nil)
+        #expect(try #require(draft(from: items, secrets: .hide)).isSecret)
+        #expect(try #require(draft(from: items, secrets: .show)).isSecret)
+    }
+
+    @Test func ordinaryTextIsNotFlaggedAsASecret() throws {
+        #expect(try #require(draft(from: [[utf8Rep("Just a note")]], secrets: .hide)).isSecret == false)
+    }
+
+    @Test func anImageWithASecretInItsLinkIsFlagged() throws {
+        let items = [[
+            utf8Rep("https://example.com/x.png?key=ghp_abcdefghijklmnopqrstuvwxyz0123456789"),
+            Representation(uti: "public.png", data: samplePNG()),
+        ]]
+        let clip = try #require(draft(from: items, secrets: .hide))
+        #expect(clip.kind == .image)
+        #expect(clip.isSecret)
     }
 
     @Test func whitespaceOnlyIsSkipped() {
         guard case .skippedEmpty = ClipBuilder.build(
-            items: [[utf8Rep("   \n ")]], source: ClipSource(bundleID: nil, name: nil), skipSecrets: true)
+            items: [[utf8Rep("   \n ")]], source: ClipSource(bundleID: nil, name: nil), secrets: .skip)
         else {
             Issue.record("expected whitespace to be skipped")
             return

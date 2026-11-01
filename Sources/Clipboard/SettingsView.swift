@@ -912,6 +912,23 @@ private struct PrivacyPage: View {
         }
     }
 
+    private var secretsDetail: String {
+        switch preferences.secretHandling {
+        case .skip: "Left out of your history, so it can't be pasted later."
+        case .hide: "Saved, but shown as dots. Pasting gives the real text."
+        case .show: "Saved and shown in your history like any other clip."
+        }
+    }
+
+    private func footnote(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 11.5))
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.leading, 3)
+            .padding(.top, -12)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             SettingsCard(title: "What gets saved") {
@@ -923,10 +940,12 @@ private struct PrivacyPage: View {
                 }
                 RowDivider()
                 SettingRow(
-                    symbol: "key.fill", tint: Theme.tileMint, title: "Skip text that looks like a secret",
-                    detail: "API keys, tokens, private keys and card numbers. It matches known formats, so it won't catch everything."
+                    symbol: "key.fill", tint: Theme.tileMint, title: "Text that looks like a secret",
+                    detail: secretsDetail
                 ) {
-                    Toggle("", isOn: $preferences.skipSecrets).labelsHidden().toggleStyle(.switch)
+                    SlidingTabs(
+                        selection: $preferences.secretHandling,
+                        options: [(.skip, "Skip"), (.hide, "Hide"), (.show, "Show")])
                 }
                 RowDivider()
                 SettingRow(
@@ -936,6 +955,7 @@ private struct PrivacyPage: View {
                     Toggle("", isOn: $preferences.linkPreviews).labelsHidden().toggleStyle(.switch)
                 }
             }
+            footnote("Secrets are API keys, tokens, private keys and card numbers. Clipboard only spots known formats, so it won't catch everything.")
 
             SettingsCard(title: "Never save from these apps") {
                 ForEach(installedIgnored, id: \.self) { bundleID in
@@ -956,11 +976,7 @@ private struct PrivacyPage: View {
                 }
                 .padding(10)
             }
-            Text(ignoredFootnote)
-            .font(.system(size: 11.5))
-            .foregroundStyle(.secondary)
-            .padding(.leading, 3)
-            .padding(.top, -12)
+            footnote(ignoredFootnote)
 
             SettingsCard(title: "Your data") {
                 SettingRow(
@@ -1111,7 +1127,7 @@ private struct AIToolsPage: View {
                 choice(.pinboards, title: "Pinboards", detail: "Only clips you've pinned.", symbol: "pin.fill", tint: Theme.tileSky)
                 choice(.everything, title: "Everything", detail: "Your whole history.", symbol: "tray.full.fill", tint: Theme.accentDeep)
             }
-            Text("Connected tools can search and read what you share here, and anything they read goes to whichever service that tool uses. They can't change your clips or your clipboard. Changes apply right away.")
+            Text("Connected tools can search and read what you share here, and anything they read goes to whichever service that tool uses. They can't change your clips or your clipboard, and they never get text that looks like a secret. Changes apply right away.")
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)

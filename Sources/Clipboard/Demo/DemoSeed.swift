@@ -25,7 +25,7 @@ enum DemoSeed {
     static func capture(_ reps: [[Representation]], app: String, name: String, store: ClipStore, minutesAgo: Double) -> Clip? {
         guard
             case .clip(let draft) = ClipBuilder.build(
-                items: reps, source: ClipSource(bundleID: app, name: name), skipSecrets: true),
+                items: reps, source: ClipSource(bundleID: app, name: name), secrets: .skip),
             let result = try? store.capture(draft, at: Date().addingTimeInterval(-minutesAgo * 60))
         else { return nil }
         return result.clip

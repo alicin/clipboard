@@ -130,67 +130,23 @@ private struct PreviewBody: View {
         // Color.clear keeps this view non-empty while loading: an empty view never appears, so .task wouldn't run.
         ZStack {
             Color.clear
-            switch clip.kind {
-            case .image:
-                if let image {
-                    Image(nsImage: image)
-                        .resizable()
-                        .scaledToFit()
-                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                        .shadow(color: .black.opacity(0.2), radius: 8, y: 3)
-                        .padding(18)
-                        .transition(.opacity)
-                }
-            case .color:
-                let color = clip.preview.flatMap(ClipColor.parse)
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(color?.swiftUIColor ?? .gray)
-                    .overlay {
-                        Text(colorDescription(color))
-                            .font(.system(size: 22, weight: .bold, design: .rounded))
-                            .foregroundStyle(color?.readableForeground ?? .white)
-                            .multilineTextAlignment(.center)
-                    }
-                    .padding(18)
-            case .file:
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 10) {
-                        ForEach(paths, id: \.self) { path in
-                            HStack(spacing: 10) {
-                                Image(nsImage: NSWorkspace.shared.icon(forFile: path)).resizable().frame(width: 34, height: 34)
-                                VStack(alignment: .leading, spacing: 1) {
-                                    Text((path as NSString).lastPathComponent).font(.system(size: 13, weight: .medium))
-                                    Text(path).font(.system(size: 11)).foregroundStyle(.secondary).textSelection(.enabled)
-                                }
-                            }
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(18)
-                }
-            case .text, .link, .code:
-                if let display {
-                    ScrollView {
-                        Text(display)
-                            .font(clip.kind == .code ? .system(size: 12, design: .monospaced) : .system(size: 14))
-                            .foregroundStyle(clip.kind == .code ? Color(white: 0.9) : Color.primary)
-                            .lineSpacing(3)
-                            .textSelection(.enabled)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(18)
-                    }
-                    .background(clip.kind == .code ? Theme.codeBackground : .clear)
-                    .transition(.opacity)
-                } else if clip.preview == nil {
-                    Text("This content can only be shown by \(clip.source.name ?? "the app it came from"). Pasting restores it in full.")
+            if clip.isHidden {
+                VStack(spacing: 12) {
+                    Text(Clip.hiddenPreview)
+                        .font(.system(size: 26, weight: .bold, design: .rounded))
+                        .tracking(2.5)
+                    Text("Hidden because it looks like a secret. Pasting gives the real text.")
                         .font(.system(size: 13))
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                        .padding(30)
                 }
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(30)
+            } else {
+                content
             }
         }
-        .task(id: clip.uuid) {
+        .task(id: "\(clip.uuid)-\(clip.isHidden)") {
+            guard !clip.isHidden else { return }
             let store = store
             let clip = clip
             switch clip.kind {
@@ -205,6 +161,68 @@ private struct PreviewBody: View {
                     try? store.fullText(clipID: clip.id)
                 }.value
                 withAnimation(.easeOut(duration: 0.12)) { text = loaded }
+            }
+        }
+    }
+
+    @ViewBuilder private var content: some View {
+        switch clip.kind {
+        case .image:
+            if let image {
+                Image(nsImage: image)
+                    .resizable()
+                    .scaledToFit()
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .shadow(color: .black.opacity(0.2), radius: 8, y: 3)
+                    .padding(18)
+                    .transition(.opacity)
+            }
+        case .color:
+            let color = clip.preview.flatMap(ClipColor.parse)
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(color?.swiftUIColor ?? .gray)
+                .overlay {
+                    Text(colorDescription(color))
+                        .font(.system(size: 22, weight: .bold, design: .rounded))
+                        .foregroundStyle(color?.readableForeground ?? .white)
+                        .multilineTextAlignment(.center)
+                }
+                .padding(18)
+        case .file:
+            ScrollView {
+                VStack(alignment: .leading, spacing: 10) {
+                    ForEach(paths, id: \.self) { path in
+                        HStack(spacing: 10) {
+                            Image(nsImage: NSWorkspace.shared.icon(forFile: path)).resizable().frame(width: 34, height: 34)
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text((path as NSString).lastPathComponent).font(.system(size: 13, weight: .medium))
+                                Text(path).font(.system(size: 11)).foregroundStyle(.secondary).textSelection(.enabled)
+                            }
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(18)
+            }
+        case .text, .link, .code:
+            if let display {
+                ScrollView {
+                    Text(display)
+                        .font(clip.kind == .code ? .system(size: 12, design: .monospaced) : .system(size: 14))
+                        .foregroundStyle(clip.kind == .code ? Color(white: 0.9) : Color.primary)
+                        .lineSpacing(3)
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(18)
+                }
+                .background(clip.kind == .code ? Theme.codeBackground : .clear)
+                .transition(.opacity)
+            } else if clip.preview == nil {
+                Text("This content can only be shown by \(clip.source.name ?? "the app it came from"). Pasting restores it in full.")
+                    .font(.system(size: 13))
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(30)
             }
         }
     }

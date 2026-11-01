@@ -49,7 +49,8 @@ Hover a clip for quick pin, copy and delete buttons, or right-click it for every
 
 - Clips are stored in `~/Library/Application Support/com.bunniesinc.clipboard`, readable only by your account. They aren't encrypted beyond your disk's own encryption.
 - Copies that apps mark as concealed or transient are never read, and password manager apps are ignored by default.
-- Text that looks like an API key, token, private key or card number is skipped. This matches known formats, so it won't catch everything.
+- Text that looks like an API key, token, private key or card number is skipped by default. In Settings > Privacy you can choose **Hide** to save it but show it as dots, or **Show** to save it like any other clip. Pasting a hidden clip gives the real text. This matches known formats, so it won't catch everything.
+- AI tools never get text that looks like a secret, and Clipboard never fetches a preview for a link that contains one.
 - Link previews are off by default, because fetching one contacts the site as soon as you copy its link.
 
 ## AI tools

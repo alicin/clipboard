@@ -5,6 +5,7 @@ public final class ClipStore: @unchecked Sendable {
     private let db: Database
     private let lock = NSRecursiveLock()
     private let fileManager = FileManager.default
+    private var hidesSecretsStorage = true
 
     private static let databaseName = "history.sqlite"
     private static let previewLength = 1200
@@ -14,9 +15,15 @@ public final class ClipStore: @unchecked Sendable {
     private static let clipColumns = """
         c.id, c.uuid, c.kind, c.title, c.preview, c.text_length, c.source_bundle_id, c.source_name,
         c.created_at, c.sort_at, c.byte_size, c.pixel_width, c.pixel_height, c.item_count, c.paste_count,
-        c.link_title, c.has_thumbnail,
+        c.link_title, c.has_thumbnail, c.is_secret,
         (SELECT group_concat(p.pinboard_id) FROM pins p WHERE p.clip_id = c.id) AS pinboard_ids
         """
+
+    /// Masking happens as clips are read, so changing the setting applies to clips already saved.
+    public var hidesSecrets: Bool {
+        get { locked { hidesSecretsStorage } }
+        set { locked { hidesSecretsStorage = newValue } }
+    }
 
     public static var defaultDirectory: URL {
         if let override = ProcessInfo.processInfo.environment["CLIPBOARD_DATA_DIR"], !override.isEmpty {
@@ -49,7 +56,22 @@ public final class ClipStore: @unchecked Sendable {
 
     private func migrate() throws {
         let version = try db.query("PRAGMA user_version").first?.int("user_version") ?? 0
-        guard version < 1 else { return }
+        if version < 1 { try createTables() }
+        if version < 2 { try addSecretFlag() }
+    }
+
+    private func addSecretFlag() throws {
+        try db.transaction {
+            try db.script("ALTER TABLE clips ADD COLUMN is_secret INTEGER NOT NULL DEFAULT 0")
+            let rows = try db.query("SELECT id, body FROM clips WHERE body IS NOT NULL AND kind != 'file'")
+            for row in rows where SecretDetector.containsSecret(row.string("body") ?? "") {
+                try db.execute("UPDATE clips SET is_secret = 1 WHERE id = ?", [.int(row.int64("id") ?? 0)])
+            }
+            try db.script("PRAGMA user_version = 2")
+        }
+    }
+
+    private func createTables() throws {
         try db.transaction {
             try db.script(
                 """
@@ -188,7 +210,7 @@ public final class ClipStore: @unchecked Sendable {
                         """
                         UPDATE clips SET uuid = ?, kind = ?, preview = ?, body = ?, text_length = ?, search_text = ?,
                             source_bundle_id = ?, source_name = ?, sort_at = ?, byte_size = ?, pixel_width = ?,
-                            pixel_height = ?, item_count = ?, manifest = ?, has_thumbnail = ?
+                            pixel_height = ?, item_count = ?, manifest = ?, has_thumbnail = ?, is_secret = ?
                         WHERE id = ?
                         """,
                         [
@@ -197,7 +219,7 @@ public final class ClipStore: @unchecked Sendable {
                             .optional(draft.source.bundleID), .optional(draft.source.name),
                             .real(now.timeIntervalSince1970), .int(draft.byteSize), .optional(draft.pixelWidth),
                             .optional(draft.pixelHeight), .int(Int64(draft.items.count)), .text(manifestJSON),
-                            .int(hasThumbnail ? 1 : 0), .int(existingID),
+                            .int(hasThumbnail ? 1 : 0), .int(draft.isSecret ? 1 : 0), .int(existingID),
                         ])
                     try? fileManager.removeItem(at: blobDirectory(oldUUID))
                     id = existingID
@@ -208,8 +230,8 @@ public final class ClipStore: @unchecked Sendable {
                         """
                         INSERT INTO clips(uuid, hash, kind, preview, body, text_length, search_text, source_bundle_id,
                             source_name, created_at, sort_at, byte_size, pixel_width, pixel_height, item_count,
-                            manifest, has_thumbnail)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            manifest, has_thumbnail, is_secret)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """,
                         [
                             .text(uuid), .text(draft.hash), .text(draft.kind.rawValue),
@@ -218,7 +240,7 @@ public final class ClipStore: @unchecked Sendable {
                             .optional(draft.source.name), .real(now.timeIntervalSince1970),
                             .real(now.timeIntervalSince1970), .int(draft.byteSize), .optional(draft.pixelWidth),
                             .optional(draft.pixelHeight), .int(Int64(draft.items.count)), .text(manifestJSON),
-                            .int(draft.thumbnail != nil ? 1 : 0),
+                            .int(draft.thumbnail != nil ? 1 : 0), .int(draft.isSecret ? 1 : 0),
                         ])
                     id = db.lastInsertID
                 }
@@ -287,16 +309,20 @@ public final class ClipStore: @unchecked Sendable {
             let kind = row.string("kind").flatMap(ClipKind.init(rawValue:)),
             let created = row.double("created_at"), let sorted = row.double("sort_at")
         else { return nil }
+        let isSecret = row.int("is_secret") == 1
+        let isHidden = isSecret && hidesSecretsStorage
         return Clip(
-            id: id, uuid: uuid, kind: kind, title: row.string("title"), preview: row.string("preview"),
+            id: id, uuid: uuid, kind: kind, title: row.string("title"),
+            preview: isHidden ? Clip.hiddenPreview : row.string("preview"),
             textLength: row.int("text_length") ?? 0,
             source: ClipSource(bundleID: row.string("source_bundle_id"), name: row.string("source_name")),
             createdAt: Date(timeIntervalSince1970: created), sortedAt: Date(timeIntervalSince1970: sorted),
             byteSize: row.int64("byte_size") ?? 0, pixelWidth: row.int("pixel_width"),
             pixelHeight: row.int("pixel_height"), itemCount: row.int("item_count") ?? 1,
-            pasteCount: row.int("paste_count") ?? 0, linkTitle: row.string("link_title"),
+            pasteCount: row.int("paste_count") ?? 0, linkTitle: isHidden ? nil : row.string("link_title"),
             hasThumbnail: row.int("has_thumbnail") == 1,
-            pinboardIDs: row.string("pinboard_ids")?.split(separator: ",").compactMap { Int64($0) } ?? [])
+            pinboardIDs: row.string("pinboard_ids")?.split(separator: ",").compactMap { Int64($0) } ?? [],
+            isSecret: isSecret, isHidden: isHidden)
     }
 
     public func clip(id: Int64) throws -> Clip? {
@@ -322,6 +348,7 @@ public final class ClipStore: @unchecked Sendable {
             if query.pinnedOnly {
                 conditions.append("EXISTS (SELECT 1 FROM pins x WHERE x.clip_id = c.id)")
             }
+            if query.excludesSecrets { conditions.append("c.is_secret = 0") }
             for token in query.text.split(whereSeparator: \.isWhitespace).map(String.init) {
                 // The trigram tokenizer can't index anything shorter than three characters.
                 if token.unicodeScalars.count >= 3 {

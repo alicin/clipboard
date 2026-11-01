@@ -357,6 +357,68 @@ try:
     state = ctl("state")
     check("Settings closes", not state["settingsVisible"], state["settingsVisible"])
 
+    print("\n# Secrets")
+    token = "token ghp_abcdefghijklmnopqrstuvwxyz0123456789"
+    dots = "•" * 12
+    count = clip_count()
+    ctl("secrets", "hide")
+    copy("text", token)
+    check("Hide saves a secret", clip_count() == count + 1, clip_count())
+    copy("text", "Copied after the secret")
+    ctl("show")
+    time.sleep(0.3)
+    state = ctl("state")
+    check("Hide shows it as dots", state["previews"][1] == f"text: {dots}", state["previews"][:2])
+    screenshot("secret-card", 1000)
+    state = key(RIGHT)
+    check("the selected clip stays masked", state["selectedPreview"] == dots, state["selectedPreview"])
+    state = key(SPACE)
+    check("the preview opens on it", state["isPreviewing"])
+    time.sleep(0.3)
+    screenshot("secret-preview", 806, 830)
+    key(ESCAPE)
+    state = key(RETURN)
+    check("pasting a hidden clip gives the real text", state["pasteboardText"] == token, state["pasteboardText"])
+    time.sleep(0.5)
+    ctl("show")
+    state = key(RETURN, "shift")
+    check("so does pasting it as plain text", state["pasteboardText"] == token, state["pasteboardText"])
+    time.sleep(0.5)
+    ctl("show")
+    ctl("text", "ghp_abc")
+    time.sleep(0.2)
+    state = ctl("state")
+    check("search finds a hidden clip by its real text", state["clipCount"] == 1 and state["previews"][0] == f"text: {dots}", state["previews"])
+    key(ESCAPE)
+    time.sleep(0.2)
+    ctl("hide")
+    ctl("secrets", "show")
+    ctl("show")
+    time.sleep(0.3)
+    state = ctl("state")
+    check("Show reveals clips already saved", state["previews"][0].startswith("text: token ghp_"), state["previews"][0])
+    ctl("hide")
+    ctl("secrets", "skip")
+    ctl("show")
+    time.sleep(0.3)
+    state = ctl("state")
+    check("Skip keeps saved secrets hidden", state["previews"][0] == f"text: {dots}", state["previews"][0])
+    ctl("hide")
+    count = clip_count()
+    copy("text", "token ghp_zyxwvutsrqponmlkjihgfedcba9876543210")
+    check("Skip doesn't save a new secret", clip_count() == count, clip_count())
+    ctl("settings")
+    ctl("settings-page", "privacy")
+    time.sleep(0.4)
+    for mode in ("skip", "hide", "show"):
+        ctl("secrets", mode)
+        time.sleep(0.4)
+        screenshot(f"settings-secrets-{mode}", 790, 805)
+    ctl("secrets", "skip")
+    ctl("settings-page", "general")
+    ctl("settings-close")
+    time.sleep(0.5)
+
     print("\n# AI tools helper")
     helper = app / "Contents/MacOS/clipboard-mcp"
     requests = [
@@ -381,6 +443,13 @@ try:
     ).stdout.splitlines()
     found = json.loads(lines[0])["result"]["content"][0]["text"]
     check("once shared, it finds text inside images", '"kind":"image"' in found, found)
+    recent = {"jsonrpc": "2.0", "id": 4, "method": "tools/call", "params": {"name": "clipboard_recent", "arguments": {"limit": 100}}}
+    lines = subprocess.run(
+        [str(helper)], input=json.dumps(recent) + "\n", text=True, capture_output=True,
+        env={**os.environ, "CLIPBOARD_DATA_DIR": str(data)}, timeout=10,
+    ).stdout.splitlines()
+    shared = json.loads(lines[0])["result"]["content"][0]["text"]
+    check("secrets are never shared", "Buy oat milk" in shared and "ghp_" not in shared and "•" not in shared, shared)
 
 finally:
     subprocess.run(["pkill", "-f", str(app / "Contents/MacOS/Clipboard")])

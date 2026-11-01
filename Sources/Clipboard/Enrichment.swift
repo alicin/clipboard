@@ -14,7 +14,8 @@ final class ClipEnricher {
     }
 
     func process(_ result: CaptureResult) {
-        guard result.isNew else { return }
+        // A link with a token in it would hand the token to the site.
+        guard result.isNew, !result.clip.isSecret else { return }
         switch result.clip.kind {
         case .image: recognizeText(in: result.clip)
         case .link where preferences.linkPreviews: fetchLinkPreview(for: result.clip)

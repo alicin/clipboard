@@ -142,10 +142,12 @@ public final class MCPServer {
             guard let query = arguments["query"] as? String, !query.isEmpty else {
                 throw ToolError(message: "query is required.")
             }
-            let clips = try store.clips(ClipQuery(text: query, kind: kind, pinnedOnly: pinnedOnly, limit: limit))
+            // Matching against secrets would let a tool work one out by guessing, so they're left out of the search too.
+            let clips = try store.clips(
+                ClipQuery(text: query, kind: kind, pinnedOnly: pinnedOnly, excludesSecrets: true, limit: limit))
             return try Self.textContent(clips.map { Self.summary($0, boards: try store.pinboards()) })
         case "clipboard_recent":
-            let clips = try store.clips(ClipQuery(kind: kind, pinnedOnly: pinnedOnly, limit: limit))
+            let clips = try store.clips(ClipQuery(kind: kind, pinnedOnly: pinnedOnly, excludesSecrets: true, limit: limit))
             return try Self.textContent(clips.map { Self.summary($0, boards: try store.pinboards()) })
         case "clipboard_get":
             guard let id = (arguments["id"] as? Int).map(Int64.init), let clip = try store.clip(id: id) else {
@@ -153,6 +155,9 @@ public final class MCPServer {
             }
             if pinnedOnly, clip.pinboardIDs.isEmpty {
                 throw ToolError(message: "This clip isn't on a pinboard, and Clipboard only shares pinboards with AI tools right now.")
+            }
+            if clip.isSecret {
+                throw ToolError(message: "This clip looks like a secret, so Clipboard doesn't share it with AI tools.")
             }
             return try fullContent(of: clip, store: store)
         case "pinboards_list":
@@ -162,7 +167,7 @@ public final class MCPServer {
             let boards = try store.pinboards()
             let board = boards.first { String($0.id) == reference || $0.name.caseInsensitiveCompare(reference) == .orderedSame }
             guard let board else { throw ToolError(message: "No pinboard named \(reference).") }
-            let clips = try store.clips(ClipQuery(pinboardID: board.id, limit: limit))
+            let clips = try store.clips(ClipQuery(pinboardID: board.id, excludesSecrets: true, limit: limit))
             return try Self.textContent(clips.map { Self.summary($0, boards: boards) })
         default:
             throw ToolError(message: "Unknown tool: \(name)")

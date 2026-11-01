@@ -15,13 +15,101 @@ final class TemporaryStore {
     deinit { try? FileManager.default.removeItem(at: directory) }
 
     @discardableResult
-    func add(_ text: String, app: String? = "com.example.app", name: String = "Example", at date: Date = Date()) throws -> Clip {
-        let draft = try #require(draft(from: [[utf8Rep(text)]], app: app).map { $0 })
+    func add(
+        _ text: String, app: String? = "com.example.app", name: String = "Example", at date: Date = Date(),
+        secrets: SecretHandling = .skip
+    ) throws -> Clip {
+        let draft = try #require(draft(from: [[utf8Rep(text)]], secrets: secrets, app: app).map { $0 })
         let renamed = ClipDraft(
             kind: draft.kind, text: draft.text, items: draft.items, hash: draft.hash,
             source: ClipSource(bundleID: app, name: name), byteSize: draft.byteSize, pixelWidth: nil, pixelHeight: nil,
-            thumbnail: nil)
+            thumbnail: nil, isSecret: draft.isSecret)
         return try store.capture(renamed, at: date).clip
+    }
+}
+
+@Suite struct SecretClipTests {
+    private let secret = "token ghp_abcdefghijklmnopqrstuvwxyz0123456789"
+
+    @Test func hiddenClipsShowDotsButKeepTheirContent() throws {
+        let temp = try TemporaryStore()
+        let clip = try temp.add(secret, secrets: .hide)
+        #expect(clip.isHidden)
+        #expect(clip.preview == Clip.hiddenPreview)
+        #expect(try temp.store.fullText(clipID: clip.id) == secret)
+        let payload = try temp.store.payload(for: clip)
+        #expect(String(decoding: payload[0][0].data, as: UTF8.self) == secret)
+    }
+
+    @Test func ordinaryClipsAreNeverHidden() throws {
+        let temp = try TemporaryStore()
+        let clip = try temp.add("Just a note", secrets: .hide)
+        #expect(!clip.isHidden)
+        #expect(clip.preview == "Just a note")
+    }
+
+    @Test func changingTheSettingAppliesToSavedClips() throws {
+        let temp = try TemporaryStore()
+        let saved = try temp.add(secret, secrets: .hide)
+
+        temp.store.hidesSecrets = false
+        let shown = try #require(try temp.store.clip(id: saved.id))
+        #expect(shown.isSecret)
+        #expect(!shown.isHidden)
+        #expect(shown.preview == secret)
+
+        temp.store.hidesSecrets = true
+        let hidden = try #require(try temp.store.clip(id: saved.id))
+        #expect(hidden.isHidden)
+        #expect(hidden.preview == Clip.hiddenPreview)
+    }
+
+    @Test func aHiddenLinkDoesNotShowItsFetchedTitle() throws {
+        let temp = try TemporaryStore()
+        let url = "https://example.com/?key=ghp_abcdefghijklmnopqrstuvwxyz0123456789"
+        let saved = try temp.add(url, secrets: .show)
+        try temp.store.setLinkMetadata(title: "Account page", thumbnail: nil, clipID: saved.id)
+        #expect(try temp.store.clip(id: saved.id)?.linkTitle == nil)
+        temp.store.hidesSecrets = false
+        #expect(try temp.store.clip(id: saved.id)?.linkTitle == "Account page")
+    }
+
+    @Test func hiddenClipsCanBeFoundByTheirRealText() throws {
+        let temp = try TemporaryStore()
+        let saved = try temp.add(secret, secrets: .hide)
+        try temp.add("Just a note")
+        let found = try temp.store.clips(ClipQuery(text: "ghp_abc"))
+        #expect(found.map(\.id) == [saved.id])
+        #expect(found.first?.preview == Clip.hiddenPreview)
+    }
+
+    @Test func renamingKeepsAClipHidden() throws {
+        let temp = try TemporaryStore()
+        let saved = try temp.add(secret, secrets: .hide)
+        try temp.store.rename(clipID: saved.id, title: "Deploy key")
+        let renamed = try #require(try temp.store.clip(id: saved.id))
+        #expect(renamed.title == "Deploy key")
+        #expect(renamed.isHidden)
+    }
+
+    @Test func queriesCanLeaveSecretsOut() throws {
+        let temp = try TemporaryStore()
+        try temp.add(secret, secrets: .hide)
+        let note = try temp.add("Just a note")
+        #expect(try temp.store.clips(ClipQuery(excludesSecrets: true)).map(\.id) == [note.id])
+        #expect(try temp.store.clips(ClipQuery(text: "ghp_abc", excludesSecrets: true)).isEmpty)
+    }
+
+    @Test func upgradingFlagsSecretsAlreadyInHistory() throws {
+        let temp = try TemporaryStore()
+        let saved = try temp.add(secret, secrets: .show)
+        let note = try temp.add("Just a note")
+        let database = try Database(path: temp.directory.appendingPathComponent("history.sqlite").path, readOnly: false)
+        try database.script("ALTER TABLE clips DROP COLUMN is_secret; PRAGMA user_version = 1")
+
+        let upgraded = try ClipStore(directory: temp.directory)
+        #expect(try upgraded.clip(id: saved.id)?.isHidden == true)
+        #expect(try upgraded.clip(id: note.id)?.isSecret == false)
     }
 }
 

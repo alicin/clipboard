@@ -333,7 +333,11 @@ struct ClipCard: View {
         var parts = [clip.title ?? clip.kind.displayName]
         if let source = clip.source.name { parts.append("from \(source)") }
         parts.append(ClipFormat.relativeTime(clip.sortedAt))
-        if let preview = clip.preview { parts.append(String(preview.prefix(200))) }
+        if clip.isHidden {
+            parts.append("hidden")
+        } else if let preview = clip.preview {
+            parts.append(String(preview.prefix(200)))
+        }
         return parts.joined(separator: ", ")
     }
 }
@@ -473,14 +477,30 @@ private struct CardContent: View {
     let query: String
 
     var body: some View {
-        switch clip.kind {
-        case .text: TextContent(clip: clip, query: query)
-        case .code: CodeContent(clip: clip, query: query)
-        case .link: LinkContent(clip: clip, store: store, query: query)
-        case .image: ImageContent(clip: clip, store: store)
-        case .file: FileContent(clip: clip)
-        case .color: ColorContent(clip: clip)
+        if clip.isHidden {
+            HiddenContent()
+        } else {
+            switch clip.kind {
+            case .text: TextContent(clip: clip, query: query)
+            case .code: CodeContent(clip: clip, query: query)
+            case .link: LinkContent(clip: clip, store: store, query: query)
+            case .image: ImageContent(clip: clip, store: store)
+            case .file: FileContent(clip: clip)
+            case .color: ColorContent(clip: clip)
+            }
         }
+    }
+}
+
+private struct HiddenContent: View {
+    var body: some View {
+        Text(Clip.hiddenPreview)
+            .font(.system(size: 17, weight: .bold, design: .rounded))
+            .tracking(1.5)
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+            .minimumScaleFactor(0.5)
+            .padding(.horizontal, 13)
     }
 }
 

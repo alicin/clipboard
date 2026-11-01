@@ -106,6 +106,21 @@ import Testing
         #expect(try tool(server, "clipboard_get", ["id": loose.id]).isError == false)
     }
 
+    @Test func secretsAreNeverShared() throws {
+        let (temp, server, _, _) = try setUp(access: .everything)
+        temp.store.hidesSecrets = false
+        let secret = try temp.add("token ghp_abcdefghijklmnopqrstuvwxyz0123456789", secrets: .show)
+        let board = try #require(try temp.store.pinboards().first)
+        try temp.store.pin(clipID: secret.id, pinboardID: board.id)
+
+        #expect(!(try tool(server, "clipboard_recent").text.contains("ghp_")))
+        #expect(try tool(server, "clipboard_search", ["query": "ghp_abc"]).text == "[]")
+        #expect(!(try tool(server, "pinboard_items", ["pinboard": "Work"]).text.contains("ghp_")))
+        let refused = try tool(server, "clipboard_get", ["id": secret.id])
+        #expect(refused.isError)
+        #expect(!refused.text.contains("ghp_"))
+    }
+
     @Test func accessChangeAppliesWithoutRestart() throws {
         let (temp, server, _, _) = try setUp(access: .everything)
         #expect(try tool(server, "clipboard_recent").isError == false)

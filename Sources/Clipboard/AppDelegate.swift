@@ -48,6 +48,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             return
         }
 
+        store.hidesSecrets = preferences.secretHandling != .show
         installMainMenu()
         FocusTracker.shared.start()
         writer = PasteboardWriter(store: store)
@@ -96,6 +97,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         preferences.onShortcutsChanged = { [weak self] in self?.registerHotKeys() }
         preferences.onRetentionChanged = { [weak self] in self?.applyRetention() }
+        preferences.onSecretHandlingChanged = { [weak self] in
+            guard let self else { return }
+            self.store.hidesSecrets = self.preferences.secretHandling != .show
+            NotificationCenter.default.post(name: .clipsChanged, object: nil)
+        }
         preferences.onPausedChanged = { [weak self] in
             guard let self else { return }
             self.refreshStatusIcon()

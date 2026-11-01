@@ -53,6 +53,11 @@ public struct Clip: Identifiable, Hashable, Sendable {
     public let linkTitle: String?
     public let hasThumbnail: Bool
     public let pinboardIDs: [Int64]
+    public let isSecret: Bool
+    /// A secret currently shown as dots. `preview` holds only `hiddenPreview`, while pasting still gives the real text.
+    public let isHidden: Bool
+
+    public static let hiddenPreview = String(repeating: "•", count: 12)
 }
 
 public struct Pinboard: Identifiable, Hashable, Sendable {
@@ -67,6 +72,7 @@ public struct ClipQuery: Sendable {
     public var kind: ClipKind?
     public var pinboardID: Int64?
     public var pinnedOnly: Bool
+    public var excludesSecrets: Bool
     public var limit: Int
     public var offset: Int
 
@@ -75,6 +81,7 @@ public struct ClipQuery: Sendable {
         kind: ClipKind? = nil,
         pinboardID: Int64? = nil,
         pinnedOnly: Bool = false,
+        excludesSecrets: Bool = false,
         limit: Int = 100,
         offset: Int = 0
     ) {
@@ -82,6 +89,7 @@ public struct ClipQuery: Sendable {
         self.kind = kind
         self.pinboardID = pinboardID
         self.pinnedOnly = pinnedOnly
+        self.excludesSecrets = excludesSecrets
         self.limit = limit
         self.offset = offset
     }
@@ -107,4 +115,8 @@ public struct KindBreakdown: Sendable, Equatable, Identifiable {
 
 public enum AIAccess: String, CaseIterable, Sendable {
     case off, pinboards, everything
+}
+
+public enum SecretHandling: String, CaseIterable, Sendable {
+    case skip, hide, show
 }
