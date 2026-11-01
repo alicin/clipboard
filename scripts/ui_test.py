@@ -20,6 +20,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import wave
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 PASTEBOARD = "com.bunniesinc.clipboard.uitest"
@@ -418,6 +419,75 @@ try:
     ctl("settings-page", "general")
     ctl("settings-close")
     time.sleep(0.5)
+
+    print("\n# Playing media in the preview")
+    silence = work / "silence.wav"
+    with wave.open(str(silence), "wb") as audio:
+        audio.setnchannels(1)
+        audio.setsampwidth(2)
+        audio.setframerate(8000)
+        audio.writeframes(b"\0\0" * 8000 * 20)
+    moving = work / "moving.gif"
+    tool("make-gif", moving)
+
+    copy("files", ROOT / "demo-assets/demo.mp4")
+    ctl("show")
+    time.sleep(0.3)
+    state = key(SPACE)
+    time.sleep(1.2)
+    state = ctl("state")
+    player = state["previewPlayer"]
+    check("Space plays a video file on its own", player["exists"] and player["rate"] > 0 and player["seconds"] > 0, player)
+    screenshot("preview-video", 806, 830)
+    state = key(ESCAPE)
+    time.sleep(0.4)
+    state = ctl("state")
+    check("closing the preview stops the video", not state["previewPlayer"]["exists"], state["previewPlayer"])
+    ctl("hide")
+
+    copy("files", silence)
+    ctl("show")
+    time.sleep(0.3)
+    key(SPACE)
+    time.sleep(1.2)
+    state = ctl("state")
+    player = state["previewPlayer"]
+    check("Space plays an audio file too", player["exists"] and player["rate"] > 0, player)
+    screenshot("preview-audio", 806, 830)
+    state = key(RIGHT)
+    time.sleep(0.6)
+    state = ctl("state")
+    check("moving on from a playing clip plays the next one", state["previewPlayer"]["exists"] and state["previewPlayer"]["rate"] > 0, state["previewPlayer"])
+    key(ESCAPE)
+    time.sleep(0.4)
+    ctl("hide")
+
+    copy("files", moving)
+    ctl("show")
+    time.sleep(0.3)
+    before = ctl("state")["previewFramesShown"]
+    key(SPACE)
+    time.sleep(1.2)
+    state = ctl("state")
+    check("Space animates a GIF file", state["previewFramesShown"] - before >= 3, state["previewFramesShown"] - before)
+    key(ESCAPE)
+    time.sleep(0.4)
+    settled = ctl("state")["previewFramesShown"]
+    time.sleep(0.8)
+    check("closing the preview stops the animation", ctl("state")["previewFramesShown"] == settled)
+    ctl("hide")
+
+    copy("gif-data", moving)
+    ctl("show")
+    time.sleep(0.3)
+    before = ctl("state")["previewFramesShown"]
+    key(SPACE)
+    time.sleep(1.2)
+    state = ctl("state")
+    check("Space animates a GIF copied as an image", state["previewFramesShown"] - before >= 3, state["previewFramesShown"] - before)
+    key(ESCAPE)
+    time.sleep(0.4)
+    ctl("hide")
 
     print("\n# AI tools helper")
     helper = app / "Contents/MacOS/clipboard-mcp"

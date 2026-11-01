@@ -1,5 +1,7 @@
 // Helper for scripts/ui_test.py: sends commands to a debug build, fills the private test pasteboard, lists windows.
 import AppKit
+import ImageIO
+import UniformTypeIdentifiers
 
 let arguments = Array(CommandLine.arguments.dropFirst())
 
@@ -48,6 +50,19 @@ func makeImage(path: String, text: String) throws {
     try rep.representation(using: .png, properties: [:])!.write(to: URL(fileURLWithPath: path))
 }
 
+func makeGIF(path: String) {
+    let destination = CGImageDestinationCreateWithURL(URL(fileURLWithPath: path) as CFURL, UTType.gif.identifier as CFString, 4, nil)!
+    let delay = [kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFDelayTime: 0.1]] as CFDictionary
+    CGImageDestinationSetProperties(destination, [kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFLoopCount: 0]] as CFDictionary)
+    for color in [NSColor.systemRed, .systemGreen, .systemBlue, .systemYellow] {
+        let context = CGContext(data: nil, width: 120, height: 80, bitsPerComponent: 8, bytesPerRow: 0, space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        context.setFillColor(color.cgColor)
+        context.fill(CGRect(x: 0, y: 0, width: 120, height: 80))
+        CGImageDestinationAddImage(destination, context.makeImage()!, delay)
+    }
+    CGImageDestinationFinalize(destination)
+}
+
 switch arguments[0] {
 case "send":
     send(stateFile: arguments[1], command: arguments.dropFirst(2).joined(separator: " "))
@@ -69,8 +84,14 @@ case "image":
     let image = NSPasteboardItem()
     image.setData(try Data(contentsOf: URL(fileURLWithPath: arguments[1])), forType: .png)
     write([image])
+case "gif-data":
+    let image = NSPasteboardItem()
+    image.setData(try Data(contentsOf: URL(fileURLWithPath: arguments[1])), forType: .init("com.compuserve.gif"))
+    write([image])
 case "make-image":
     try makeImage(path: arguments[1], text: arguments[2])
+case "make-gif":
+    makeGIF(path: arguments[1])
 case "files":
     write(arguments.dropFirst().map { path in
         let file = NSPasteboardItem()

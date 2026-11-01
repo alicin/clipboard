@@ -1,4 +1,5 @@
 #if DEBUG
+import AVKit
 import AppKit
 import Carbon.HIToolbox
 import ClipboardCore
@@ -196,6 +197,16 @@ final class TestControl {
         model.togglePin(clip, board: board)
     }
 
+    private var previewPlayerState: [String: Any] {
+        func player(in view: NSView) -> AVPlayer? {
+            if let view = view as? AVPlayerView { return view.player }
+            return view.subviews.lazy.compactMap(player(in:)).first
+        }
+        let found = NSApp.windows.lazy.compactMap { $0.contentView.flatMap(player(in:)) }.first
+        guard let found else { return ["exists": false] }
+        return ["exists": true, "rate": found.rate, "seconds": found.currentTime().seconds, "failed": found.currentItem?.status == .failed]
+    }
+
     private func writeState(sequence: String) {
         let model = panel.model
         let pasteboard = AppPasteboard.shared
@@ -224,6 +235,8 @@ final class TestControl {
             "boards": model.pinboards.map(\.name),
             "edit": edit,
             "isPreviewing": model.isPreviewing,
+            "previewFramesShown": PreviewProbe.framesShown,
+            "previewPlayer": previewPlayerState,
             "isPresented": model.isPresented,
             "commandHeld": model.commandHeld,
             "firstVisibleIndex": model.firstVisibleIndex,

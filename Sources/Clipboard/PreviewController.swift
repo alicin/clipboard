@@ -1,6 +1,9 @@
+import AVKit
 import AppKit
 import ClipboardCore
+import ImageIO
 import SwiftUI
+import UniformTypeIdentifiers
 
 @MainActor
 final class PreviewController {
@@ -67,7 +70,7 @@ private struct PreviewView: View {
                 VStack(alignment: .leading, spacing: 0) {
                     PreviewHeader(clip: clip)
                     Rectangle().fill(.primary.opacity(0.1)).frame(height: 0.5)
-                    PreviewBody(clip: clip, store: model.store)
+                    PreviewBody(clip: clip, store: model.store, isActive: model.isPreviewing)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
                 .id(clip.id)
@@ -121,8 +124,12 @@ private struct PreviewHeader: View {
 private struct PreviewBody: View {
     let clip: Clip
     let store: ClipStore
+    /// The panel stays alive between previews, so anything that moves or makes a sound has to stop when this goes false.
+    let isActive: Bool
     @State private var text: String?
     @State private var image: NSImage?
+    @State private var movingImage: Data?
+    @State private var playable: PlayableFile?
 
     private static let displayLimit = 120_000
 
@@ -151,16 +158,74 @@ private struct PreviewBody: View {
             let clip = clip
             switch clip.kind {
             case .image:
-                let loaded = await Task.detached(priority: .userInitiated) { () -> NSImage? in
+                let loaded = await Task.detached(priority: .userInitiated) { () -> Picture? in
                     guard let payload = try? store.payload(for: clip) else { return nil }
-                    return payload.joined().lazy.compactMap { NSImage(data: $0.data) }.first
+                    return Picture(representations: payload.joined().map(\.data))
                 }.value
-                withAnimation(.easeOut(duration: 0.15)) { image = loaded }
+                withAnimation(.easeOut(duration: 0.15)) {
+                    image = loaded?.image
+                    movingImage = loaded?.moving
+                }
             default:
                 let loaded = await Task.detached(priority: .userInitiated) {
                     try? store.fullText(clipID: clip.id)
                 }.value
                 withAnimation(.easeOut(duration: 0.12)) { text = loaded }
+                if clip.kind == .file, clip.itemCount == 1, let path = paths.first { await loadMedia(at: path) }
+            }
+        }
+    }
+
+    private func loadMedia(at path: String) async {
+        let url = URL(fileURLWithPath: path)
+        guard let type = UTType(filenameExtension: url.pathExtension), FileManager.default.fileExists(atPath: path) else { return }
+        if type.conforms(to: .audiovisualContent) {
+            let loaded = await PlayableFile(url: url)
+            withAnimation(.easeOut(duration: 0.15)) { playable = loaded }
+        } else if type.conforms(to: .image) {
+            let loaded = await Task.detached(priority: .userInitiated) { () -> Picture? in
+                (try? Data(contentsOf: url, options: .mappedIfSafe)).flatMap { Picture(representations: [$0]) }
+            }.value
+            withAnimation(.easeOut(duration: 0.15)) {
+                image = loaded?.image
+                movingImage = loaded?.moving
+            }
+        }
+    }
+
+    @ViewBuilder private var picture: some View {
+        let shape = RoundedRectangle(cornerRadius: 10, style: .continuous)
+        Group {
+            if let movingImage, let image {
+                MovingImage(data: movingImage, poster: image, isActive: isActive)
+            } else if let image {
+                Image(nsImage: image).resizable().scaledToFit()
+            }
+        }
+        .clipShape(shape)
+        .shadow(color: .black.opacity(0.2), radius: 8, y: 3)
+        .padding(18)
+        .transition(.opacity)
+    }
+
+    @ViewBuilder private func player(_ file: PlayableFile) -> some View {
+        // Not kept while closed: dropping the view is what stops the sound.
+        if isActive {
+            if let size = file.videoSize {
+                PlayerView(url: file.url)
+                    .aspectRatio(size, contentMode: .fit)
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .shadow(color: .black.opacity(0.2), radius: 8, y: 3)
+                    .padding(18)
+            } else {
+                VStack(spacing: 14) {
+                    Image(nsImage: NSWorkspace.shared.icon(forFile: file.url.path)).resizable().frame(width: 96, height: 96)
+                    Text(file.url.lastPathComponent).font(.system(size: 14, weight: .medium))
+                    PlayerView(url: file.url)
+                        .frame(maxWidth: 420, maxHeight: 44)
+                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                }
+                .padding(18)
             }
         }
     }
@@ -168,15 +233,7 @@ private struct PreviewBody: View {
     @ViewBuilder private var content: some View {
         switch clip.kind {
         case .image:
-            if let image {
-                Image(nsImage: image)
-                    .resizable()
-                    .scaledToFit()
-                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                    .shadow(color: .black.opacity(0.2), radius: 8, y: 3)
-                    .padding(18)
-                    .transition(.opacity)
-            }
+            picture
         case .color:
             let color = clip.preview.flatMap(ClipColor.parse)
             RoundedRectangle(cornerRadius: 16, style: .continuous)
@@ -188,6 +245,10 @@ private struct PreviewBody: View {
                         .multilineTextAlignment(.center)
                 }
                 .padding(18)
+        case .file where playable != nil:
+            if let playable { player(playable) }
+        case .file where image != nil:
+            picture
         case .file:
             ScrollView {
                 VStack(alignment: .leading, spacing: 10) {
@@ -241,5 +302,111 @@ private struct PreviewBody: View {
         guard let color else { return clip.preview ?? "" }
         let channels = [color.red, color.green, color.blue].map { String(Int(($0 * 255).rounded())) }.joined(separator: ", ")
         return "\(color.hex)\nrgb(\(channels))"
+    }
+}
+
+/// A picture ready to show, and its original bytes if it has more than one frame.
+private struct Picture: @unchecked Sendable {
+    let image: NSImage
+    let moving: Data?
+
+    // An app may offer a flat copy next to the original, so the moving one wins wherever it sits.
+    init?(representations: [Data]) {
+        let moving = representations.first(where: Self.isMoving)
+        guard let image = moving.flatMap(NSImage.init(data:)) ?? representations.lazy.compactMap(NSImage.init(data:)).first else {
+            return nil
+        }
+        self.image = image
+        self.moving = moving
+    }
+
+    private static func isMoving(_ data: Data) -> Bool {
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil), CGImageSourceGetCount(source) > 1,
+            let type = CGImageSourceGetType(source) as String?
+        else { return false }
+        // A multi-page TIFF also has several frames, but those are pages.
+        return type != UTType.tiff.identifier
+    }
+}
+
+private struct MovingImage: View {
+    let data: Data
+    let poster: NSImage
+    let isActive: Bool
+    @State private var frame: CGImage?
+    @State private var stopper = AnimationStopper()
+
+    var body: some View {
+        Group {
+            if let frame {
+                Image(decorative: frame, scale: 1).resizable().scaledToFit()
+            } else {
+                Image(nsImage: poster).resizable().scaledToFit()
+            }
+        }
+        .onChange(of: isActive, initial: true) { _, active in
+            stopper.isStopped = true
+            guard active else { return }
+            let next = AnimationStopper()
+            stopper = next
+            CGAnimateImageDataWithBlock(data as CFData, nil) { _, image, stop in
+                #if DEBUG
+                PreviewProbe.framesShown += 1
+                #endif
+                frame = image
+                if next.isStopped { stop.pointee = true }
+            }
+        }
+        .onDisappear { stopper.isStopped = true }
+    }
+}
+
+private final class AnimationStopper {
+    var isStopped = false
+}
+
+#if DEBUG
+enum PreviewProbe {
+    nonisolated(unsafe) static var framesShown = 0
+}
+#endif
+
+private struct PlayableFile: Equatable {
+    let url: URL
+    /// Nil for a file that's only sound.
+    let videoSize: CGSize?
+
+    /// Nil when AVFoundation can't play the file, as with most WebM and MKV, which then gets the plain file row.
+    init?(url: URL) async {
+        let asset = AVURLAsset(url: url)
+        guard (try? await asset.load(.isPlayable)) == true else { return nil }
+        self.url = url
+        var size: CGSize?
+        if let track = try? await asset.loadTracks(withMediaType: .video).first,
+            let (natural, transform) = try? await track.load(.naturalSize, .preferredTransform) {
+            let turned = natural.applying(transform)
+            size = CGSize(width: abs(turned.width), height: abs(turned.height))
+        }
+        videoSize = size
+    }
+}
+
+private struct PlayerView: NSViewRepresentable {
+    let url: URL
+
+    func makeNSView(context: Context) -> AVPlayerView {
+        let view = AVPlayerView()
+        view.player = AVPlayer(url: url)
+        view.showsFullScreenToggleButton = false
+        view.allowsPictureInPicturePlayback = false
+        view.player?.play()
+        return view
+    }
+
+    func updateNSView(_ view: AVPlayerView, context: Context) {}
+
+    static func dismantleNSView(_ view: AVPlayerView, coordinator: ()) {
+        view.player?.pause()
+        view.player = nil
     }
 }
