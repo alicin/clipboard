@@ -56,6 +56,10 @@ public enum GoogleSignIn {
     /// Only the app's own hidden folder, which Drive keeps apart from the user's files.
     static let scope = "https://www.googleapis.com/auth/drive.appdata"
 
+    /// A Desktop app client takes any local port, but a Web application client only takes a redirect it lists exactly.
+    public static let redirectPort: UInt16 = 53847
+    public static var redirectURI: String { "http://127.0.0.1:\(redirectPort)" }
+
     static func authorizationURL(client: GoogleClient, redirect: String, state: String, challenge: String) -> URL {
         var components = URLComponents(string: "https://accounts.google.com/o/oauth2/v2/auth")!
         components.queryItems = [
@@ -82,11 +86,19 @@ public enum GoogleSignIn {
             .replacingOccurrences(of: "=", with: "")
     }
 
+    // If something else holds the usual port, a Desktop app client can still sign in on another.
+    private static func openReceiver() async throws -> (LoopbackReceiver, UInt16) {
+        let usual = try LoopbackReceiver(port: NWEndpoint.Port(rawValue: redirectPort) ?? .any)
+        if let port = try? await usual.start() { return (usual, port) }
+        usual.stop()
+        let fallback = try LoopbackReceiver(port: .any)
+        return (fallback, try await fallback.start())
+    }
+
     /// Walks the user through Google's page in their browser, and returns the refresh token to keep.
     public static func run(client: GoogleClient, session: URLSession = .shared, open: @Sendable (URL) -> Void) async throws -> String {
-        let receiver = try LoopbackReceiver()
+        let (receiver, port) = try await openReceiver()
         defer { receiver.stop() }
-        let port = try await receiver.start()
         let redirect = "http://127.0.0.1:\(port)"
         let state = randomToken()
         let verifier = randomToken()
@@ -120,9 +132,10 @@ private final class LoopbackReceiver: @unchecked Sendable {
         <h2>Back to Clipboard</h2><p>You can close this tab.</p></body>
         """
 
-    init() throws {
+    init(port: NWEndpoint.Port) throws {
         let parameters = NWParameters.tcp
-        parameters.requiredLocalEndpoint = .hostPort(host: "127.0.0.1", port: .any)
+        parameters.requiredLocalEndpoint = .hostPort(host: "127.0.0.1", port: port)
+        parameters.allowLocalEndpointReuse = true
         listener = try NWListener(using: parameters)
     }
 
@@ -134,7 +147,7 @@ private final class LoopbackReceiver: @unchecked Sendable {
                 case .ready:
                     pending?.resume(returning: listener.port?.rawValue ?? 0)
                     pending = nil
-                case .failed(let error):
+                case .failed(let error), .waiting(let error):
                     pending?.resume(throwing: error)
                     pending = nil
                 default: break

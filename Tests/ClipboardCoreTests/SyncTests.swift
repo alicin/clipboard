@@ -1,5 +1,6 @@
 import CryptoKit
 import Foundation
+import Network
 import Testing
 
 @testable import ClipboardCore
@@ -574,6 +575,39 @@ private final class FakeDriveProtocol: URLProtocol {
             }
         }
         #expect(refresh == "refresh-from-code")
+    }
+
+    private func signIn(redirects: @escaping @Sendable (String) -> Void) async throws -> String {
+        try await GoogleSignIn.run(client: client, session: FakeDriveProtocol.session) { url in
+            let items = URLComponents(url: url, resolvingAgainstBaseURL: false)!.queryItems!
+            let redirect = items.first { $0.name == "redirect_uri" }!.value!
+            let state = items.first { $0.name == "state" }!.value!
+            redirects(redirect)
+            Task { _ = try? await URLSession.shared.data(from: URL(string: "\(redirect)/?state=\(state)&code=the-code")!) }
+        }
+    }
+
+    @Test func signsInOnTheSameAddressEveryTime() async throws {
+        for _ in 1...3 {
+            _ = try await signIn { redirect in
+                #expect(redirect == GoogleSignIn.redirectURI)
+            }
+        }
+    }
+
+    @Test func fallsBackToAnotherPortIfTheUsualOneIsTaken() async throws {
+        let parameters = NWParameters.tcp
+        parameters.requiredLocalEndpoint = .hostPort(host: "127.0.0.1", port: NWEndpoint.Port(rawValue: GoogleSignIn.redirectPort)!)
+        let squatter = try NWListener(using: parameters)
+        squatter.newConnectionHandler = { $0.cancel() }
+        squatter.start(queue: .global())
+        defer { squatter.cancel() }
+        try await Task.sleep(for: .milliseconds(150))
+
+        _ = try await signIn { redirect in
+            #expect(redirect.hasPrefix("http://127.0.0.1:"))
+            #expect(redirect != GoogleSignIn.redirectURI)
+        }
     }
 
     @Test func refusingOnGooglesPageSaysSo() async throws {

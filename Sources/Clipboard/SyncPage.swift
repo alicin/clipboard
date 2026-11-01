@@ -155,6 +155,11 @@ struct SyncPage: View {
                 .font(.system(size: 11.5))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+            Text("Using a Web application client instead? Add \(GoogleSignIn.redirectURI) to its authorized redirect URIs.")
+                .font(.system(size: 11.5))
+                .foregroundStyle(.secondary)
+                .textSelection(.enabled)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .padding(13)
     }

@@ -183,7 +183,7 @@ Sync is off by default. Choose where it goes in Settings > Sync:
 
 Clips are encrypted with your passphrase before they leave the Mac, so neither Apple nor Google can read them, and nobody can recover the passphrase for you. Files, text that looks like a secret and clips over 25 MB never sync. Deleting a clip deletes it on your other devices too, but your retention setting only applies to the Mac it's set on.
 
-Google Drive uses a client you create yourself, because Clipboard has no servers and no Google app of its own. Settings walks you through it. It can only reach its own hidden folder in your Drive, not your files. Use the same client on every device, and click **Publish app** when you set it up, or Google signs you out every 7 days.
+Google Drive uses a client you create yourself, because Clipboard has no servers and no Google app of its own. Settings walks you through it. It can only reach its own hidden folder in your Drive, not your files. Use the same client on every device, and click **Publish app** when you set it up, or Google signs you out every 7 days. A Desktop app client needs nothing more. A Web application client also has to list `http://127.0.0.1:53847` as an authorized redirect URI.
 
 iCloud sync here is a folder in iCloud Drive rather than Apple's CloudKit, which needs a paid developer account. The format is plain and documented in [docs/sync-format.md](docs/sync-format.md), so a client on another platform can join.
 
