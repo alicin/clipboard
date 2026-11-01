@@ -1,14 +1,123 @@
-# Clipboard
+> [!WARNING]
+> **Allergy notice: this repo contains AI.** Every line was written by [Claude](https://claude.com/claude-code), while a human supplied the taste and notes like "a lil easy on the glow." If AI-written code makes your eye twitch, please move along, no hard feelings. We hear small-batch, hand-typed clipboard managers are lovely this time of year.
 
-A native macOS clipboard manager. It saves everything you copy to a searchable shelf at the bottom of the screen.
+<div align="center">
 
-![Clipboard's shelf opening, arrow keys moving between clips, a clip pasting into a document, and search finding a word inside a message](demo-assets/preview.webp)
+<br>
 
-The full demo runs about 2½ minutes, with no sound. It's rendered from the app's real views, with scripted input and sample clips. There's also a [1080p download](https://github.com/alicin/clipboard/raw/main/demo-assets/demo.mp4) (43 MB).
+<p><img src="demo-assets/readme/icon.png" width="128" height="128" alt=""></p>
 
-https://github.com/user-attachments/assets/05a479f7-0001-4dbf-ab6f-49d3df278835
+<p><img src="demo-assets/readme/wordmark.png" width="340" height="89" alt="Clipboard"></p>
 
-Requires macOS 15.4 or later. Everything stays on your Mac.
+### Everything you copy, one keystroke away.
+
+A native clipboard manager for your Mac. Press <kbd>⇧</kbd> <kbd>⌘</kbd> <kbd>V</kbd> and your whole history<br>rises over whatever you're doing, ready to search, preview and paste.
+
+<br>
+
+<a href="#build-and-install"><img src="demo-assets/readme/button-install.png" height="42" alt="Build and install"></a>
+
+<sub>Requires macOS 15.4 or later</sub>
+
+<br>
+
+https://github.com/user-attachments/assets/72422053-3c02-4b4e-b98d-bb76a7312268
+
+<sub>The full tour, about 2½ minutes with no sound. It's rendered from the app's real views, with scripted input and sample clips. There's also a <a href="https://github.com/alicin/clipboard/raw/main/demo-assets/demo.mp4">1080p download</a> (44 MB).</sub>
+
+<br>
+
+<table>
+<tr>
+<td width="33%" valign="top" align="center"><b>Stays on your Mac</b><br><br>No account and no cloud. Your history lives in a folder only your account can read.</td>
+<td width="33%" valign="top" align="center"><b>Made for the keyboard</b><br><br>Arrows to move, Return to paste, just type to search. Your hands never leave the keys.</td>
+<td width="33%" valign="top" align="center"><b>Feels like macOS</b><br><br>Built in Swift with AppKit and SwiftUI. It lives in your menu bar and follows your appearance.</td>
+</tr>
+</table>
+
+<br>
+
+## Your whole history, one shortcut away
+
+Copy anything in any app and it's saved. Press <kbd>⇧</kbd> <kbd>⌘</kbd> <kbd>V</kbd> and the shelf rises over what you're doing, so you never leave your app.
+
+<img src="demo-assets/readme/open.webp" width="100%" alt="Text being copied in an app, then the shelf rising from the bottom of the screen with every copied clip on it">
+
+<br>
+
+## Every clip looks like what it is
+
+Links, images, code, colors and files each get their own card, in the color of the app they came from. Arrow keys glide between them.
+
+<img src="demo-assets/readme/tour.webp" width="100%" alt="Arrow keys moving along the shelf past a link, an image, code, a color and files">
+
+<br>
+
+## Paste right where you left off
+
+Press <kbd>↩︎</kbd> and the shelf gets out of the way while the clip lands in your app. Text, links and photos all paste the same way, and <kbd>⇧</kbd> <kbd>↩︎</kbd> pastes plain text.
+
+<img src="demo-assets/readme/paste.webp" width="100%" alt="A clip and then a photo landing in a document as the shelf closes">
+
+<br>
+
+## Find it by typing
+
+Just start typing. Search covers everything you've ever copied, including the text inside images. Or click a filter to see only links, images, files, colors or code.
+
+<img src="demo-assets/readme/search.webp" width="49%" alt="Typing into the search field, with matching clips lighting up, including text found inside an image"> <img src="demo-assets/readme/filters.webp" width="49%" alt="Clicking a filter to show only images, then only code">
+
+<br>
+
+## Look closer, or skip straight to it
+
+Press <kbd>Space</kbd> to read a whole clip or play a video, and keep arrowing while it's open. Hold <kbd>⌘</kbd> to number the clips you can see, then press <kbd>1</kbd> to <kbd>9</kbd> to paste one.
+
+<img src="demo-assets/readme/preview.webp" width="49%" alt="A large preview of a clip above the shelf, following the selection"> <img src="demo-assets/readme/numbers.webp" width="49%" alt="Holding Command shows a number on each visible clip">
+
+<br>
+
+## Keep what matters on a pinboard
+
+Drag a clip onto a pinboard's name, or pin it from its card. Pinned clips stay when old history gets cleaned up, and <kbd>⇥</kbd> flips between boards.
+
+<img src="demo-assets/readme/pinboards.webp" width="100%" alt="Creating a pinboard, dragging a clip onto its name, and tabbing between boards">
+
+<br>
+
+## Let it guess, or line things up
+
+Suggested ranks clips for the app you're in, using what you've pasted there before. Paste Stack (<kbd>⇧</kbd> <kbd>⌘</kbd> <kbd>C</kbd>) collects several copies, then each <kbd>⌘</kbd> <kbd>V</kbd> pastes the next one, oldest first.
+
+<img src="demo-assets/readme/suggested.webp" width="49%" alt="The Suggested tab ranking clips for the app in use"> <img src="demo-assets/readme/stack.webp" width="49%" alt="Copying several things into the Paste Stack, then pasting them one at a time">
+
+<br>
+
+## Your clipboard stays yours
+
+Password managers are ignored by default. Text that looks like a key or token can be skipped, shown as dots, or kept as it is, and hidden clips still paste in full.
+
+<img src="demo-assets/readme/secrets.webp" width="49%" alt="A clip on the shelf showing only dots because its text looks like a secret"> <img src="demo-assets/readme/privacy.webp" width="49%" alt="The Privacy settings, with Hide chosen for text that looks like a secret">
+
+<br>
+
+## Your AI tools can search it too
+
+A read-only MCP server lets tools like Claude search what you choose to share: nothing, your pinboards, or everything. They can't change your clips, and they never get text that looks like a secret.
+
+<img src="demo-assets/readme/ai.webp" width="100%" alt="Claude Code searching the clipboard from a terminal">
+
+<br>
+
+## Settings that stay out of your way
+
+Allow direct paste once, change any shortcut and see what you've saved, all in one place. It follows your Mac into dark mode too.
+
+<img src="demo-assets/readme/settings.webp" width="49%" alt="Turning on direct paste in Settings, then changing a shortcut"> <img src="demo-assets/readme/dark.webp" width="49%" alt="The shelf in dark mode">
+
+<br>
+
+</div>
 
 ## Build and install
 
@@ -29,21 +138,22 @@ Clipboard works without any permission, but choosing a clip then only copies it 
 
 | Keys | Action |
 | --- | --- |
-| ⇧⌘V | Open or close the shelf (change it in Settings) |
-| Type | Search everything, including text inside images |
-| ← → | Move between clips (⌘← ⌘→ for first and last) |
-| ↩ | Paste |
-| ⇧↩ | Paste as plain text, or with formatting if plain text is your default |
-| ⌘1 to ⌘9 | Paste a visible clip (hold ⌘ to see the numbers) |
-| Space | Preview |
-| ⌘C | Copy without pasting |
-| ⌘⌫ | Delete |
-| ⇥ ⇧⇥ | Move between History, Suggested and your pinboards |
-| ⎋ | Close the preview, clear the search, then close the shelf |
+| <kbd>⇧</kbd> <kbd>⌘</kbd> <kbd>V</kbd> | Open or close the shelf (change it in Settings) |
+| Just type | Search everything, including text inside images |
+| <kbd>←</kbd> <kbd>→</kbd> | Move between clips |
+| <kbd>⌘</kbd> <kbd>←</kbd> or <kbd>⌘</kbd> <kbd>→</kbd> | Jump to the first or last clip |
+| <kbd>↩︎</kbd> | Paste |
+| <kbd>⇧</kbd> <kbd>↩︎</kbd> | Paste as plain text, or with formatting if plain text is your default |
+| <kbd>⌘</kbd> <kbd>1</kbd> to <kbd>⌘</kbd> <kbd>9</kbd> | Paste a visible clip (hold <kbd>⌘</kbd> to see the numbers) |
+| <kbd>Space</kbd> | Preview a clip, and play it if it's a video, audio file or animated image |
+| <kbd>⌘</kbd> <kbd>C</kbd> | Copy without pasting |
+| <kbd>⌘</kbd> <kbd>⌫</kbd> | Delete |
+| <kbd>⇥</kbd> or <kbd>⇧</kbd> <kbd>⇥</kbd> | Move between History, Suggested and your pinboards |
+| <kbd>⎋</kbd> | Close the preview, clear the search, then close the shelf |
 
 Hover a clip for quick pin, copy and delete buttons, or right-click it for everything else. You can also drag a clip onto a pinboard's name or into another app.
 
-**Paste Stack (⇧⌘C):** copy several things in order, then each ⌘V pastes the next one, oldest first.
+**Paste Stack (<kbd>⇧</kbd> <kbd>⌘</kbd> <kbd>C</kbd>):** copy several things in order, then each <kbd>⌘</kbd> <kbd>V</kbd> pastes the next one, oldest first.
 
 **Suggested:** ranks clips for the app you're in, using what you've pasted there before, what you just copied elsewhere, and what came from that app. It's a local ranking with no AI model.
 
@@ -67,7 +177,8 @@ claude mcp add clipboard -- ~/Applications/Clipboard.app/Contents/MacOS/clipboar
 
 iPhone and iPad apps, iCloud sync and shared team pinboards are left out. Suggested uses local ranking in place of Apple Intelligence.
 
-## Development
+<details>
+<summary><b>Development</b></summary>
 
 ```bash
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test
@@ -83,4 +194,7 @@ scripts/ui_test.py
 | `Sources/clipboard-mcp` | MCP server executable |
 | `scripts/make-icon.swift` | Draws the app icon |
 | `scripts/make-demo.sh` | Renders the demo video from the real views, with the kittens in `demo-assets` |
+| `scripts/make-clips.py` | Cuts this page's clips out of the demo video |
 | `Sources/Clipboard/Demo` | The demo's stage, script and compositor, compiled into debug builds only |
+
+</details>
