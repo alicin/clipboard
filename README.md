@@ -138,18 +138,18 @@ Clipboard works without any permission, but choosing a clip then only copies it 
 
 | Keys | Action |
 | --- | --- |
-| <kbd>⇧</kbd> <kbd>⌘</kbd> <kbd>V</kbd> | Open or close the shelf (change it in Settings) |
-| Just type | Search everything, including text inside images |
-| <kbd>←</kbd> <kbd>→</kbd> | Move between clips |
-| <kbd>⌘</kbd> <kbd>←</kbd> or <kbd>⌘</kbd> <kbd>→</kbd> | Jump to the first or last clip |
-| <kbd>↩︎</kbd> | Paste |
-| <kbd>⇧</kbd> <kbd>↩︎</kbd> | Paste as plain text, or with formatting if plain text is your default |
-| <kbd>⌘</kbd> <kbd>1</kbd> to <kbd>⌘</kbd> <kbd>9</kbd> | Paste a visible clip (hold <kbd>⌘</kbd> to see the numbers) |
-| <kbd>Space</kbd> | Preview a clip, and play it if it's a video, audio file or animated image |
-| <kbd>⌘</kbd> <kbd>C</kbd> | Copy without pasting |
-| <kbd>⌘</kbd> <kbd>⌫</kbd> | Delete |
-| <kbd>⇥</kbd> or <kbd>⇧</kbd> <kbd>⇥</kbd> | Move between History, Suggested and your pinboards |
-| <kbd>⎋</kbd> | Close the preview, clear the search, then close the shelf |
+| <img src="demo-assets/readme/keys/shift.png" height="30" align="middle" alt="⇧"> <img src="demo-assets/readme/keys/cmd.png" height="30" align="middle" alt="⌘"> <img src="demo-assets/readme/keys/v.png" height="30" align="middle" alt="V"> | Open or close the shelf (change it in Settings) |
+| <img src="demo-assets/readme/keys/type.png" height="30" align="middle" alt="Type"> | Search everything, including text inside images |
+| <img src="demo-assets/readme/keys/left.png" height="30" align="middle" alt="←"> <img src="demo-assets/readme/keys/right.png" height="30" align="middle" alt="→"> | Move between clips |
+| <img src="demo-assets/readme/keys/cmd.png" height="30" align="middle" alt="⌘"> <img src="demo-assets/readme/keys/left.png" height="30" align="middle" alt="←"> or <img src="demo-assets/readme/keys/cmd.png" height="30" align="middle" alt="⌘"> <img src="demo-assets/readme/keys/right.png" height="30" align="middle" alt="→"> | Jump to the first or last clip |
+| <img src="demo-assets/readme/keys/return.png" height="30" align="middle" alt="↩︎"> | Paste |
+| <img src="demo-assets/readme/keys/shift.png" height="30" align="middle" alt="⇧"> <img src="demo-assets/readme/keys/return.png" height="30" align="middle" alt="↩︎"> | Paste as plain text, or with formatting if plain text is your default |
+| <img src="demo-assets/readme/keys/cmd.png" height="30" align="middle" alt="⌘"> <img src="demo-assets/readme/keys/1.png" height="30" align="middle" alt="1"> to <img src="demo-assets/readme/keys/cmd.png" height="30" align="middle" alt="⌘"> <img src="demo-assets/readme/keys/9.png" height="30" align="middle" alt="9"> | Paste a visible clip (hold ⌘ to see the numbers) |
+| <img src="demo-assets/readme/keys/space.png" height="30" align="middle" alt="Space"> | Preview a clip, and play it if it's a video, audio file or animated image |
+| <img src="demo-assets/readme/keys/cmd.png" height="30" align="middle" alt="⌘"> <img src="demo-assets/readme/keys/c.png" height="30" align="middle" alt="C"> | Copy without pasting |
+| <img src="demo-assets/readme/keys/cmd.png" height="30" align="middle" alt="⌘"> <img src="demo-assets/readme/keys/delete.png" height="30" align="middle" alt="⌫"> | Delete |
+| <img src="demo-assets/readme/keys/tab.png" height="30" align="middle" alt="⇥"> or <img src="demo-assets/readme/keys/shift.png" height="30" align="middle" alt="⇧"> <img src="demo-assets/readme/keys/tab.png" height="30" align="middle" alt="⇥"> | Move between History, Suggested and your pinboards |
+| <img src="demo-assets/readme/keys/esc.png" height="30" align="middle" alt="⎋"> | Close the preview, clear the search, then close the shelf |
 
 Hover a clip for quick pin, copy and delete buttons, or right-click it for everything else. You can also drag a clip onto a pinboard's name or into another app.
 
@@ -193,6 +193,7 @@ scripts/ui_test.py
 | `Sources/Clipboard` | The app: capture, hotkeys, shelf, stack, settings |
 | `Sources/clipboard-mcp` | MCP server executable |
 | `scripts/make-icon.swift` | Draws the app icon |
+| `scripts/make-readme-art.swift` | Draws this page's title, button and key caps |
 | `scripts/make-demo.sh` | Renders the demo video from the real views, with the kittens in `demo-assets` |
 | `scripts/make-clips.py` | Cuts this page's clips out of the demo video |
 | `Sources/Clipboard/Demo` | The demo's stage, script and compositor, compiled into debug builds only |
