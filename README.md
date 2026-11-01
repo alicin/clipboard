@@ -132,7 +132,7 @@ Clipboard runs from the menu bar. On first launch it opens Settings so you can a
 
 Clipboard works without any permission, but choosing a clip then only copies it and you press ⌘V yourself. To drop clips straight into the app you're using, and to let the Paste Stack notice each ⌘V, click **Allow access** in Settings and turn Clipboard on in the Accessibility list.
 
-`scripts/build-app.sh` signs with a stable certificate so this permission survives rebuilds: the "Gremlin Code Signing" certificate if it's in your login keychain, or whatever `CLIPBOARD_SIGN_IDENTITY` names. With neither, it signs ad-hoc with a requirement that names only the bundle identifier, which also survives rebuilds, but any ad-hoc app claiming that identifier would inherit the permission.
+`scripts/build-app.sh` signs with a stable certificate so this permission survives rebuilds: whatever `CLIPBOARD_SIGN_IDENTITY` names, or else the first usable code signing certificate in your login keychain. With neither, it signs ad-hoc with a requirement that names only the bundle identifier, which also survives rebuilds, but any ad-hoc app claiming that identifier would inherit the permission.
 
 ## Using the shelf
 

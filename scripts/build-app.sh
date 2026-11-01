@@ -32,12 +32,13 @@ cp Resources/Info.plist "$APP/Contents/Info.plist"
 cp Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 
 # macOS keys the Accessibility permission to the signature's designated requirement. A self-signed certificate
-# keeps that stable across rebuilds, so the permission survives them. Gremlin's installer leaves one in the login
-# keychain, and CLIPBOARD_SIGN_IDENTITY picks another.
+# keeps that stable across rebuilds, so the permission survives them. CLIPBOARD_SIGN_IDENTITY picks one, and otherwise
+# the first usable one in the login keychain signs.
 KEYCHAIN="$HOME/Library/Keychains/login.keychain-db"
 IDENTITY="${CLIPBOARD_SIGN_IDENTITY:-}"
-if [[ -z "$IDENTITY" ]] && security find-identity -p codesigning "$KEYCHAIN" 2>/dev/null | grep -q '"Gremlin Code Signing"'; then
-    IDENTITY="Gremlin Code Signing"
+if [[ -z "$IDENTITY" ]]; then
+    IDENTITY="$(security find-identity -p codesigning "$KEYCHAIN" 2>/dev/null \
+        | sed -n -E '/EXPIRED|REVOKED/!s/^ *[0-9]+\) [0-9A-F]+ "(.*)".*/\1/p' | head -1 || true)"
 fi
 
 # Sign the helper first: signing the outer bundle seals the helper's signature into it.
