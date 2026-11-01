@@ -73,6 +73,7 @@ final class Preferences {
     @ObservationIgnored var onRetentionChanged: (() -> Void)?
     @ObservationIgnored var onPausedChanged: (() -> Void)?
     @ObservationIgnored var onSecretHandlingChanged: (() -> Void)?
+    @ObservationIgnored var onLinkPreviewsChanged: (() -> Void)?
 
     var plainTextByDefault: Bool { didSet { defaults.set(plainTextByDefault, forKey: Key.plainText) } }
     var secretHandling: SecretHandling {
@@ -81,7 +82,12 @@ final class Preferences {
             onSecretHandlingChanged?()
         }
     }
-    var linkPreviews: Bool { didSet { defaults.set(linkPreviews, forKey: Key.linkPreviews) } }
+    var linkPreviews: Bool {
+        didSet {
+            defaults.set(linkPreviews, forKey: Key.linkPreviews)
+            onLinkPreviewsChanged?()
+        }
+    }
     var retentionDays: Int {
         didSet {
             defaults.set(retentionDays, forKey: Key.retentionDays)
@@ -118,6 +124,7 @@ final class Preferences {
 
     private init() {
         let defaults = AppEnvironment.defaults
+        defaults.register(defaults: [Key.linkPreviews: true])
         plainTextByDefault = defaults.bool(forKey: Key.plainText)
         // Someone who turned off the old on/off switch was saving these in the clear.
         let keptSecrets = defaults.object(forKey: Key.legacySkipSecrets) as? Bool == false

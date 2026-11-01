@@ -100,8 +100,10 @@ subprocess.run(
 subprocess.run(
     ["defaults", "write", "com.bunniesinc.clipboard.uitest", "ignoredBundleIDs", "-array", "com.example.ignored"], check=True
 )
-if options.network:
-    subprocess.run(["defaults", "write", "com.bunniesinc.clipboard.uitest", "linkPreviews", "-bool", "true"], check=True)
+subprocess.run(
+    ["defaults", "write", "com.bunniesinc.clipboard.uitest", "linkPreviews", "-bool", "true" if options.network else "false"],
+    check=True,
+)
 
 copy("text", "seed", settle=0)
 subprocess.run(
@@ -136,8 +138,9 @@ try:
     if options.network:
         time.sleep(6)
         with database() as connection:
-            title = connection.execute("select link_title from clips where kind = 'link'").fetchone()[0]
+            title, icon = connection.execute("select link_title, has_icon from clips where kind = 'link'").fetchone()
         check("link previews fetch a title", bool(title), title)
+        check("link previews fetch an icon", icon == 1, icon)
 
     total = clip_count()
     copy("concealed", "hunter2-password")

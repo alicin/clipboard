@@ -182,6 +182,27 @@ public enum Thumbnailer {
         public let height: Int
     }
 
+    /// Favicon files often hold several sizes, and the first isn't always the largest.
+    public static func icon(from data: Data, maxPixels: Int) -> Output? {
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil) else { return nil }
+        let widths = (0..<CGImageSourceGetCount(source)).map { index in
+            (CGImageSourceCopyPropertiesAtIndex(source, index, nil) as? [CFString: Any])?[kCGImagePropertyPixelWidth] as? Int ?? 0
+        }
+        guard let largest = widths.indices.max(by: { widths[$0] < widths[$1] }), widths[largest] > 0 else { return nil }
+        let options: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceThumbnailMaxPixelSize: min(maxPixels, widths[largest]),
+        ]
+        guard let image = CGImageSourceCreateThumbnailAtIndex(source, largest, options as CFDictionary) else { return nil }
+        let output = NSMutableData()
+        guard let destination = CGImageDestinationCreateWithData(output as CFMutableData, UTType.png.identifier as CFString, 1, nil)
+        else { return nil }
+        CGImageDestinationAddImage(destination, image, nil)
+        guard CGImageDestinationFinalize(destination) else { return nil }
+        return Output(png: output as Data, width: image.width, height: image.height)
+    }
+
     public static func make(from data: Data, maxPixels: Int) -> Output? {
         guard let source = CGImageSourceCreateWithData(data as CFData, nil), CGImageSourceGetCount(source) > 0 else {
             return nil

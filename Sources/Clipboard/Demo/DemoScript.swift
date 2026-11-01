@@ -389,7 +389,7 @@ final class DemoScript {
         press(["→"], hold: 0.5)
         model.moveSelection(by: 1)
         follow(2)
-        caption("Links", "With the page's title and image, if you turn previews on.")
+        caption("Links", "With the page's title, image and icon.")
         await wait(2.3)
         engine.snap("tour-link")
         press(["→"], hold: 0.5)

@@ -11,11 +11,12 @@ public final class ClipStore: @unchecked Sendable {
     private static let previewLength = 1200
     private static let indexedLength = 100_000
     private static let thumbnailName = "thumbnail.png"
+    private static let iconName = "icon.png"
 
     private static let clipColumns = """
         c.id, c.uuid, c.kind, c.title, c.preview, c.text_length, c.source_bundle_id, c.source_name,
         c.created_at, c.sort_at, c.byte_size, c.pixel_width, c.pixel_height, c.item_count, c.paste_count,
-        c.link_title, c.has_thumbnail, c.is_secret,
+        c.link_title, c.has_thumbnail, c.has_icon, c.is_secret,
         (SELECT group_concat(p.pinboard_id) FROM pins p WHERE p.clip_id = c.id) AS pinboard_ids
         """
 
@@ -58,6 +59,18 @@ public final class ClipStore: @unchecked Sendable {
         let version = try db.query("PRAGMA user_version").first?.int("user_version") ?? 0
         if version < 1 { try createTables() }
         if version < 2 { try addSecretFlag() }
+        if version < 3 { try addLinkPreviewColumns() }
+    }
+
+    private func addLinkPreviewColumns() throws {
+        try db.transaction {
+            try db.script(
+                """
+                ALTER TABLE clips ADD COLUMN has_icon INTEGER NOT NULL DEFAULT 0;
+                ALTER TABLE clips ADD COLUMN link_checked INTEGER NOT NULL DEFAULT 0;
+                PRAGMA user_version = 3;
+                """)
+        }
     }
 
     private func addSecretFlag() throws {
@@ -160,6 +173,10 @@ public final class ClipStore: @unchecked Sendable {
         clip.hasThumbnail ? blobDirectory(clip.uuid).appendingPathComponent(Self.thumbnailName) : nil
     }
 
+    public func iconURL(for clip: Clip) -> URL? {
+        clip.hasIcon ? blobDirectory(clip.uuid).appendingPathComponent(Self.iconName) : nil
+    }
+
     // MARK: Capture
 
     private struct ManifestEntry: Codable {
@@ -171,7 +188,7 @@ public final class ClipStore: @unchecked Sendable {
     public func capture(_ draft: ClipDraft, at now: Date = Date()) throws -> CaptureResult {
         try locked {
             let existing = try db.query(
-                "SELECT id, uuid, has_thumbnail, title, ocr_text, link_title FROM clips WHERE hash = ?",
+                "SELECT id, uuid, has_thumbnail, has_icon, title, ocr_text, link_title FROM clips WHERE hash = ?",
                 [.text(draft.hash)]
             ).first
 
@@ -202,6 +219,11 @@ public final class ClipStore: @unchecked Sendable {
                             at: blobDirectory(oldUUID).appendingPathComponent(Self.thumbnailName),
                             to: folder.appendingPathComponent(Self.thumbnailName))
                         hasThumbnail = true
+                    }
+                    if existing.int("has_icon") == 1 {
+                        try? fileManager.moveItem(
+                            at: blobDirectory(oldUUID).appendingPathComponent(Self.iconName),
+                            to: folder.appendingPathComponent(Self.iconName))
                     }
                     let search = Self.searchText(
                         title: existing.string("title"), body: draft.text, ocr: existing.string("ocr_text"),
@@ -288,7 +310,8 @@ public final class ClipStore: @unchecked Sendable {
         }
     }
 
-    public func setLinkMetadata(title: String?, thumbnail: Data?, clipID: Int64) throws {
+    /// Marks the link as tried, so nothing here visits it again. Whatever a fetch didn't find keeps its old value.
+    public func setLinkMetadata(title: String?, thumbnail: Data?, icon: Data? = nil, clipID: Int64) throws {
         try locked {
             guard let row = try db.query("SELECT uuid FROM clips WHERE id = ?", [.int(clipID)]).first,
                 let uuid = row.string("uuid")
@@ -297,8 +320,28 @@ public final class ClipStore: @unchecked Sendable {
                 try thumbnail.write(to: blobDirectory(uuid).appendingPathComponent(Self.thumbnailName))
                 try db.execute("UPDATE clips SET has_thumbnail = 1 WHERE id = ?", [.int(clipID)])
             }
-            try db.execute("UPDATE clips SET link_title = ? WHERE id = ?", [.optional(title), .int(clipID)])
+            if let icon {
+                try icon.write(to: blobDirectory(uuid).appendingPathComponent(Self.iconName))
+                try db.execute("UPDATE clips SET has_icon = 1 WHERE id = ?", [.int(clipID)])
+            }
+            try db.execute(
+                "UPDATE clips SET link_title = COALESCE(?, link_title), link_checked = 1 WHERE id = ?",
+                [.optional(title), .int(clipID)])
             try refreshSearchText(clipID: clipID)
+        }
+    }
+
+    /// Links nothing has tried to fetch yet, newest first. Secrets stay out, since visiting one would hand it to the site.
+    public func linksMissingPreview(since cutoff: Date, limit: Int = 30) throws -> [Clip] {
+        try locked {
+            try db.query(
+                """
+                SELECT \(Self.clipColumns) FROM clips c
+                WHERE c.kind = 'link' AND c.link_checked = 0 AND c.is_secret = 0 AND c.sort_at >= ?
+                ORDER BY c.sort_at DESC LIMIT ?
+                """,
+                [.real(cutoff.timeIntervalSince1970), .int(Int64(limit))]
+            ).compactMap(makeClip)
         }
     }
 
@@ -320,7 +363,7 @@ public final class ClipStore: @unchecked Sendable {
             byteSize: row.int64("byte_size") ?? 0, pixelWidth: row.int("pixel_width"),
             pixelHeight: row.int("pixel_height"), itemCount: row.int("item_count") ?? 1,
             pasteCount: row.int("paste_count") ?? 0, linkTitle: isHidden ? nil : row.string("link_title"),
-            hasThumbnail: row.int("has_thumbnail") == 1,
+            hasThumbnail: row.int("has_thumbnail") == 1, hasIcon: !isHidden && row.int("has_icon") == 1,
             pinboardIDs: row.string("pinboard_ids")?.split(separator: ",").compactMap { Int64($0) } ?? [],
             isSecret: isSecret, isHidden: isHidden)
     }

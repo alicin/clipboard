@@ -97,6 +97,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         preferences.onShortcutsChanged = { [weak self] in self?.registerHotKeys() }
         preferences.onRetentionChanged = { [weak self] in self?.applyRetention() }
+        preferences.onLinkPreviewsChanged = { [weak self] in self?.enricher.fetchMissingLinkPreviews() }
         preferences.onSecretHandlingChanged = { [weak self] in
             guard let self else { return }
             self.store.hidesSecrets = self.preferences.secretHandling != .show
@@ -111,6 +112,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         installStatusItem()
         monitor.start()
         runMaintenance()
+        enricher.fetchMissingLinkPreviews()
 
         let timer = Timer(timeInterval: 3600, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.runMaintenance() }

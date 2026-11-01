@@ -163,7 +163,7 @@ Hover a clip for quick pin, copy and delete buttons, or right-click it for every
 - Copies that apps mark as concealed or transient are never read, and password manager apps are ignored by default.
 - Text that looks like an API key, token, private key or card number is skipped by default. In Settings > Privacy you can choose **Hide** to save it but show it as dots, or **Show** to save it like any other clip. Pasting a hidden clip gives the real text. This matches known formats, so it won't catch everything.
 - AI tools never get text that looks like a secret, and Clipboard never fetches a preview for a link that contains one.
-- Link previews are off by default, because fetching one contacts the site as soon as you copy its link.
+- Link previews are on by default, so copying a link contacts that site for its title, image and icon. Private addresses and links that look single-use, like password resets, are skipped, and you can turn previews off in Settings > Privacy.
 
 ## AI tools
 

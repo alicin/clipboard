@@ -152,7 +152,8 @@ enum DemoSeed {
         let mochi = capturePhoto("mochi", store: store, minutesAgo: 12)
         if let link = captureText("https://tinypaws.example/first-week-home", app: "com.apple.Safari", name: "Safari", store: store, minutesAgo: 6) {
             try? store.setLinkMetadata(
-                title: "How to welcome a new kitten", thumbnail: Thumbnailer.make(from: DemoAssets.photoData("pixel"), maxPixels: 720)?.png, clipID: link.id)
+                title: "How to welcome a new kitten", thumbnail: Thumbnailer.make(from: DemoAssets.photoData("pixel"), maxPixels: 720)?.png,
+                icon: Thumbnailer.icon(from: DemoAssets.photoData("sprout"), maxPixels: 128)?.png, clipID: link.id)
         }
         let message = captureText(
             "Can you send me the kitten pics before standup? The whole team has been asking, and honestly morale depends on it. Mochi in the tiny sweater first, then the one with the paw on the keyboard.",

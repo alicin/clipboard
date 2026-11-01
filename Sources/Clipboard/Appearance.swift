@@ -249,6 +249,15 @@ final class ThumbnailCache {
         return image
     }
 
+    func icon(for clip: Clip, store: ClipStore) async -> NSImage? {
+        guard let url = store.iconURL(for: clip) else { return nil }
+        let key = "icon:" + clip.uuid
+        if let image = cached(key) { return image }
+        let image = await Task.detached(priority: .userInitiated) { NSImage(contentsOf: url) }.value
+        if let image { images.setObject(image, forKey: key as NSString) }
+        return image
+    }
+
     func fileThumbnail(path: String) async -> NSImage? {
         let key = "file:" + path
         if let image = cached(key) { return image }

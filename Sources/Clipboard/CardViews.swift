@@ -576,12 +576,14 @@ private struct LinkContent: View {
     let store: ClipStore
     let query: String
     @State private var image: NSImage?
+    @State private var icon: NSImage?
 
     init(clip: Clip, store: ClipStore, query: String) {
         self.clip = clip
         self.store = store
         self.query = query
         _image = State(initialValue: ThumbnailCache.shared.cached(clip.uuid))
+        _icon = State(initialValue: ThumbnailCache.shared.cached("icon:" + clip.uuid))
     }
 
     private var host: String { ClipFormat.displayHost(of: clip) }
@@ -600,10 +602,19 @@ private struct LinkContent: View {
                     .scaledToFill()
                     .frame(maxWidth: .infinity, maxHeight: 92)
                     .clipped()
+                    .overlay(alignment: .bottomLeading) {
+                        if let icon { SiteIcon(image: icon, size: 30).padding(8) }
+                    }
             } else {
-                LetterTile(text: host)
-                    .padding(.horizontal, 13)
-                    .padding(.top, 13)
+                Group {
+                    if let icon {
+                        SiteIcon(image: icon, size: 44)
+                    } else {
+                        LetterTile(text: host)
+                    }
+                }
+                .padding(.horizontal, 13)
+                .padding(.top, 13)
             }
             VStack(alignment: .leading, spacing: 4) {
                 Text(highlighted(clip.linkTitle ?? host))
@@ -619,13 +630,34 @@ private struct LinkContent: View {
             Spacer(minLength: 0)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .task(id: clip.uuid + (clip.hasThumbnail ? "1" : "0")) {
+        .task(id: clip.uuid + (clip.hasThumbnail ? "1" : "0") + (clip.hasIcon ? "1" : "0")) {
             image = await ThumbnailCache.shared.thumbnail(for: clip, store: store)
+            icon = await ThumbnailCache.shared.icon(for: clip, store: store)
         }
     }
 }
 
-/// Stands in for a favicon, since fetching a real one would contact the site just because a link was copied.
+/// White behind it, because plenty of favicons are transparent and drawn for a light page.
+private struct SiteIcon: View {
+    let image: NSImage
+    let size: CGFloat
+
+    private var shape: RoundedRectangle { RoundedRectangle(cornerRadius: size * 0.25, style: .continuous) }
+
+    var body: some View {
+        Image(nsImage: image)
+            .resizable()
+            .interpolation(.high)
+            .scaledToFit()
+            .frame(width: size, height: size)
+            .background(.white)
+            .clipShape(shape)
+            .overlay { shape.strokeBorder(.black.opacity(0.08), lineWidth: 0.5) }
+            .shadow(color: .black.opacity(0.14), radius: 3, y: 2)
+    }
+}
+
+/// Stands in until a favicon arrives, and for good with link previews off or a site that doesn't offer one.
 private struct LetterTile: View {
     let text: String
 

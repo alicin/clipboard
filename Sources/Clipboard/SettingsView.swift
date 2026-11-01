@@ -950,7 +950,7 @@ private struct PrivacyPage: View {
                 RowDivider()
                 SettingRow(
                     symbol: "link", tint: Theme.tileSky, title: "Show link previews",
-                    detail: "Clipboard visits a link when you copy it to fetch its title and image, and the site can see that. Private addresses are never visited."
+                    detail: "Clipboard visits links you copy to fetch a title, image and icon, and the site can see that. Private and single-use links are skipped."
                 ) {
                     Toggle("", isOn: $preferences.linkPreviews).labelsHidden().toggleStyle(.switch)
                 }

@@ -52,6 +52,7 @@ public struct Clip: Identifiable, Hashable, Sendable {
     public let pasteCount: Int
     public let linkTitle: String?
     public let hasThumbnail: Bool
+    public let hasIcon: Bool
     public let pinboardIDs: [Int64]
     public let isSecret: Bool
     /// A secret currently shown as dots. `preview` holds only `hiddenPreview`, while pasting still gives the real text.
