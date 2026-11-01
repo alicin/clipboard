@@ -4,7 +4,7 @@ A native macOS clipboard manager. It saves everything you copy to a searchable s
 
 ![Clipboard's shelf opening, arrow keys moving between clips, a clip pasting into a document, and search finding a word inside a message](demo-assets/preview.webp)
 
-The full demo runs 2:38, with no sound. It's rendered from the app's real views, with scripted input and sample clips. There's also a [1080p download](https://github.com/alicin/clipboard/raw/main/demo-assets/demo.mp4) (43 MB).
+The full demo runs about 2½ minutes, with no sound. It's rendered from the app's real views, with scripted input and sample clips. There's also a [1080p download](https://github.com/alicin/clipboard/raw/main/demo-assets/demo.mp4) (43 MB).
 
 https://github.com/user-attachments/assets/05a479f7-0001-4dbf-ab6f-49d3df278835
 
