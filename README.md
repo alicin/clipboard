@@ -2,6 +2,10 @@
 
 A native macOS clipboard manager. It saves everything you copy to a searchable shelf at the bottom of the screen.
 
+[![Clipboard's shelf opening, arrow keys moving between clips, a clip pasting into a document, and search finding a word inside a message](demo-assets/preview.webp)](demo-assets/demo.mp4)
+
+[Watch the full demo](demo-assets/demo.mp4) (2:38, no sound). It's rendered from the app's real views, with scripted input and sample clips.
+
 Requires macOS 15.4 or later. Everything stays on your Mac.
 
 ## Build and install
