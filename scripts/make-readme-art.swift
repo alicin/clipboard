@@ -1,5 +1,5 @@
 // Draws the README's title, install button and key caps. GitHub fixes <kbd> text at 11px and strips custom CSS, so bigger
-// keys have to be images. They're dark like the key overlay in the demo, which reads on both of GitHub's themes.
+// keys have to be images. They're light, like real Mac keys, with a border that holds up on GitHub's dark theme too.
 //     swiftc -o /tmp/make-readme-art scripts/make-readme-art.swift && /tmp/make-readme-art demo-assets/readme
 import AppKit
 import SwiftUI
@@ -49,27 +49,25 @@ struct InstallButton: View {
 struct KeyCap: View {
     let label: String
 
-    private var shape: RoundedRectangle { RoundedRectangle(cornerRadius: 7, style: .continuous) }
+    private var shape: RoundedRectangle { RoundedRectangle(cornerRadius: 6, style: .continuous) }
 
     var body: some View {
         Text(label)
-            .font(.system(size: label.count > 2 ? 13 : 15.5, weight: .semibold, design: .rounded))
-            .foregroundStyle(.white)
-            .padding(.horizontal, label.count > 2 ? 11 : 0)
-            .frame(minWidth: 30, minHeight: 28)
+            .font(.system(size: label.count > 2 ? 11 : 13, weight: .semibold, design: .rounded))
+            .foregroundStyle(Color(red: 0.14, green: 0.16, blue: 0.18))
+            .padding(.horizontal, label.count > 2 ? 9 : 0)
+            .frame(minWidth: 25, minHeight: 23)
             .background(
                 LinearGradient(
-                    colors: [Color(red: 0.25, green: 0.28, blue: 0.32), Color(red: 0.15, green: 0.17, blue: 0.20)],
+                    colors: [.white, Color(red: 0.95, green: 0.96, blue: 0.97)],
                     startPoint: .top, endPoint: .bottom),
                 in: shape
             )
-            .overlay { shape.strokeBorder(.white.opacity(0.16), lineWidth: 0.75) }
+            .overlay { shape.strokeBorder(.black.opacity(0.16), lineWidth: 0.75) }
             // The lip along the bottom edge is what makes it read as a key rather than a badge.
             .padding(.bottom, 2)
             .background(alignment: .bottom) {
-                RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .fill(Color(red: 0.07, green: 0.08, blue: 0.10))
-                    .frame(height: 16)
+                shape.fill(Color(red: 0.72, green: 0.75, blue: 0.78)).frame(height: 14)
             }
     }
 }
