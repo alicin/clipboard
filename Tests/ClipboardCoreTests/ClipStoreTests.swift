@@ -106,7 +106,7 @@ final class TemporaryStore {
         let note = try temp.add("Just a note")
         let database = try Database(path: temp.directory.appendingPathComponent("history.sqlite").path, readOnly: false)
         try database.script(
-            "ALTER TABLE clips DROP COLUMN is_secret; ALTER TABLE clips DROP COLUMN has_icon; ALTER TABLE clips DROP COLUMN link_checked; PRAGMA user_version = 1")
+            "ALTER TABLE clips DROP COLUMN is_secret; ALTER TABLE clips DROP COLUMN has_icon; ALTER TABLE clips DROP COLUMN link_checked; ALTER TABLE clips DROP COLUMN updated_at; DROP TABLE sync_objects; DROP TABLE sync_deletions; PRAGMA user_version = 1")
 
         let upgraded = try ClipStore(directory: temp.directory)
         #expect(try upgraded.clip(id: saved.id)?.isHidden == true)

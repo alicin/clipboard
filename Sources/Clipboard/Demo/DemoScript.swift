@@ -865,7 +865,7 @@ final class DemoScript {
 
         caption("AI tools, on your terms", "Share nothing, just your pinboards, or everything.")
         look(at: CGPoint(x: 800, y: 420), zoom: 1.28)
-        await clickAt(CGPoint(x: sidebarX, y: rowY(3)), duration: 0.6)
+        await clickAt(CGPoint(x: sidebarX, y: rowY(4)), duration: 0.6)
         DemoControl.shared.settingsScrollOffset = 0
         withAnimation(Motion.snappy) { navigation.page = .aiTools }
         await wait(0.9)

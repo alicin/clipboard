@@ -121,3 +121,7 @@ public enum AIAccess: String, CaseIterable, Sendable {
 public enum SecretHandling: String, CaseIterable, Sendable {
     case skip, hide, show
 }
+
+public enum SyncMode: String, CaseIterable, Sendable {
+    case off, iCloud, googleDrive
+}

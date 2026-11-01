@@ -59,6 +59,7 @@ final class Preferences {
         static let secretHandling = "secretHandling"
         static let legacySkipSecrets = "skipSecrets"
         static let linkPreviews = "linkPreviews"
+        static let syncMode = "syncMode"
         static let retentionDays = "retentionDays"
         static let ignoredApps = "ignoredBundleIDs"
         static let paused = "isPaused"
@@ -74,6 +75,7 @@ final class Preferences {
     @ObservationIgnored var onPausedChanged: (() -> Void)?
     @ObservationIgnored var onSecretHandlingChanged: (() -> Void)?
     @ObservationIgnored var onLinkPreviewsChanged: (() -> Void)?
+    @ObservationIgnored var onSyncModeChanged: (() -> Void)?
 
     var plainTextByDefault: Bool { didSet { defaults.set(plainTextByDefault, forKey: Key.plainText) } }
     var secretHandling: SecretHandling {
@@ -86,6 +88,12 @@ final class Preferences {
         didSet {
             defaults.set(linkPreviews, forKey: Key.linkPreviews)
             onLinkPreviewsChanged?()
+        }
+    }
+    var syncMode: SyncMode {
+        didSet {
+            defaults.set(syncMode.rawValue, forKey: Key.syncMode)
+            onSyncModeChanged?()
         }
     }
     var retentionDays: Int {
@@ -131,6 +139,7 @@ final class Preferences {
         secretHandling = defaults.string(forKey: Key.secretHandling).flatMap(SecretHandling.init(rawValue:))
             ?? (keptSecrets ? .show : .skip)
         linkPreviews = defaults.bool(forKey: Key.linkPreviews)
+        syncMode = defaults.string(forKey: Key.syncMode).flatMap(SyncMode.init(rawValue:)) ?? .off
         retentionDays = defaults.integer(forKey: Key.retentionDays)
         ignoredBundleIDs = defaults.stringArray(forKey: Key.ignoredApps) ?? Self.defaultIgnoredApps
         isPaused = defaults.bool(forKey: Key.paused)

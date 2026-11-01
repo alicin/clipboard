@@ -5,7 +5,7 @@ import ServiceManagement
 import SwiftUI
 
 enum SettingsPage: String, CaseIterable, Identifiable {
-    case general, shortcuts, privacy, aiTools
+    case general, shortcuts, privacy, sync, aiTools
 
     var id: String { rawValue }
 
@@ -14,6 +14,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         case .general: "General"
         case .shortcuts: "Shortcuts"
         case .privacy: "Privacy"
+        case .sync: "Sync"
         case .aiTools: "AI Tools"
         }
     }
@@ -23,6 +24,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         case .general: "How Clipboard behaves day to day."
         case .shortcuts: "Keys for opening Clipboard and moving around the shelf."
         case .privacy: "What Clipboard saves, and what it never touches."
+        case .sync: "Keep your clips on more than one device. It's off until you turn it on."
         case .aiTools: "Let tools like Claude search what you choose to share."
         }
     }
@@ -32,6 +34,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         case .general: "gearshape.fill"
         case .shortcuts: "command"
         case .privacy: "hand.raised.fill"
+        case .sync: "arrow.triangle.2.circlepath"
         case .aiTools: "sparkles"
         }
     }
@@ -41,6 +44,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         case .general: Theme.tileSlate
         case .shortcuts: Theme.tileSky
         case .privacy: Theme.tileMint
+        case .sync: Theme.tileSky
         case .aiTools: Theme.tileIris
         }
     }
@@ -55,15 +59,17 @@ final class SettingsNavigation {
 final class SettingsWindowController: NSObject, NSWindowDelegate {
     let navigation = SettingsNavigation()
     private let store: ClipStore
+    private let sync: SyncController
     private var window: NSWindow?
 
-    init(store: ClipStore) {
+    init(store: ClipStore, sync: SyncController) {
         self.store = store
+        self.sync = sync
     }
 
     func show() {
         if window == nil {
-            let hosting = NSHostingController(rootView: SettingsRoot(store: store, navigation: navigation))
+            let hosting = NSHostingController(rootView: SettingsRoot(store: store, sync: sync, navigation: navigation))
             hosting.sizingOptions = []
             let window = NSWindow(contentViewController: hosting)
             window.title = "Clipboard Settings"
@@ -100,12 +106,13 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
 
 struct SettingsRoot: View {
     let store: ClipStore
+    var sync: SyncController?
     @Bindable var navigation: SettingsNavigation
 
     var body: some View {
         HStack(spacing: 0) {
             SettingsSidebar(navigation: navigation)
-            PageHost(store: store, page: navigation.page)
+            PageHost(store: store, sync: sync, page: navigation.page)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(nsColor: .windowBackgroundColor))
@@ -240,7 +247,7 @@ private struct CaptureStatusButton: View {
     }
 }
 
-private struct IconTile: View {
+struct IconTile: View {
     let symbol: String
     let tint: Color
     var size: CGFloat = 30
@@ -266,6 +273,7 @@ private struct IconTile: View {
 
 private struct PageHost: View {
     let store: ClipStore
+    let sync: SyncController?
     let page: SettingsPage
 
     private var content: some View {
@@ -278,6 +286,8 @@ private struct PageHost: View {
             case .general: GeneralPage(store: store)
             case .shortcuts: ShortcutsPage()
             case .privacy: PrivacyPage(store: store)
+            case .sync:
+                if let sync { SyncPage(sync: sync) }
             case .aiTools: AIToolsPage(store: store)
             }
         }
@@ -315,7 +325,7 @@ private struct PageHost: View {
     }
 }
 
-private struct SettingsCard<Content: View>: View {
+struct SettingsCard<Content: View>: View {
     var title: String?
     @ViewBuilder var content: Content
 
@@ -337,7 +347,7 @@ private struct SettingsCard<Content: View>: View {
     }
 }
 
-private struct SettingRow<Trailing: View>: View {
+struct SettingRow<Trailing: View>: View {
     let symbol: String
     let tint: Color
     let title: String
@@ -364,13 +374,13 @@ private struct SettingRow<Trailing: View>: View {
     }
 }
 
-private struct RowDivider: View {
+struct RowDivider: View {
     var body: some View {
         Rectangle().fill(.primary.opacity(0.07)).frame(height: 0.5).padding(.leading, 55)
     }
 }
 
-private struct PillButtonStyle: ButtonStyle {
+struct PillButtonStyle: ButtonStyle {
     enum Kind { case primary, quiet, destructive }
     var kind: Kind = .quiet
 
@@ -1003,7 +1013,9 @@ private struct PrivacyPage: View {
     @ViewBuilder private var deleteRowContent: some View {
         if isConfirmingDelete {
             VStack(alignment: .leading, spacing: 10) {
-                Text("Delete your clipboard history? This can't be undone.")
+                Text(preferences.syncMode == .off
+                    ? "Delete your clipboard history? This can't be undone."
+                    : "Delete your clipboard history here and on your other synced devices? This can't be undone.")
                     .font(.system(size: 13, weight: .medium))
                 HStack(spacing: 7) {
                     Button("Keep everything") {
@@ -1023,7 +1035,7 @@ private struct PrivacyPage: View {
         } else {
             SettingRow(
                 symbol: "trash.fill", tint: .red, title: "Delete history",
-                detail: lastDeleted.map { $0 == 1 ? "Deleted 1 clip." : "Deleted \($0.formatted()) clips." } ?? "Remove saved clips from this Mac."
+                detail: lastDeleted.map { $0 == 1 ? "Deleted 1 clip." : "Deleted \($0.formatted()) clips." } ?? (preferences.syncMode == .off ? "Remove saved clips from this Mac." : "Remove saved clips from this Mac and your synced devices.")
             ) {
                 Button("Delete…") {
                     withAnimation(Motion.snappy) { isConfirmingDelete = true }

@@ -11,13 +11,15 @@ final class TestControl {
     private let panel: PanelController
     private let stack: StackController
     private let settings: SettingsWindowController
+    private let sync: SyncController
     private var observer: NSObjectProtocol?
     private var pendingSnapshot: String?
 
-    init(panel: PanelController, stack: StackController, settings: SettingsWindowController) {
+    init(panel: PanelController, stack: StackController, settings: SettingsWindowController, sync: SyncController) {
         self.panel = panel
         self.stack = stack
         self.settings = settings
+        self.sync = sync
     }
 
     func start() {
@@ -55,6 +57,9 @@ final class TestControl {
         case "pause": Preferences.shared.isPaused = arguments == "on"
         case "secrets": Preferences.shared.secretHandling = SecretHandling(rawValue: arguments) ?? .skip
         case "hover": hoverCard(arguments)
+        case "sync-mode": Preferences.shared.syncMode = SyncMode(rawValue: arguments) ?? .off
+        case "sync-passphrase": sync.unlock(passphrase: arguments)
+        case "sync-now": sync.syncNow()
         case "hotkey": sendHotKey(id: arguments == "stack" ? HotKeyID.stack : HotKeyID.open)
         case "rename-clip": if let clip = panel.model.selectedClip { panel.model.beginRename(clip) }
         case "rename-board": if let board = panel.model.pinboards.first(where: { $0.name == arguments }) { panel.model.beginRename(board) }
@@ -235,6 +240,9 @@ final class TestControl {
             "boards": model.pinboards.map(\.name),
             "edit": edit,
             "isPreviewing": model.isPreviewing,
+            "syncStatus": String(describing: sync.status),
+            "syncLastSynced": sync.lastSynced != nil,
+            "syncPassphraseProblem": sync.passphraseProblem ?? "",
             "previewFramesShown": PreviewProbe.framesShown,
             "previewPlayer": previewPlayerState,
             "isPresented": model.isPresented,

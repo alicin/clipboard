@@ -29,7 +29,7 @@ https://github.com/user-attachments/assets/72422053-3c02-4b4e-b98d-bb76a7312268
 
 <table>
 <tr>
-<td width="33%" valign="top" align="center"><b>Stays on your Mac</b><br><br>No account and no cloud. Your history lives in a folder only your account can read.</td>
+<td width="33%" valign="top" align="center"><b>Stays on your Mac</b><br><br>No account, and no cloud unless you turn on sync. Your history lives in a folder only your account can read.</td>
 <td width="33%" valign="top" align="center"><b>Made for the keyboard</b><br><br>Arrows to move, Return to paste, just type to search. Your hands never leave the keys.</td>
 <td width="33%" valign="top" align="center"><b>Feels like macOS</b><br><br>Built in Swift with AppKit and SwiftUI. It lives in your menu bar and follows your appearance.</td>
 </tr>
@@ -101,6 +101,12 @@ Password managers are ignored by default. Text that looks like a key or token ca
 
 <br>
 
+## Sync, on your terms
+
+It's off until you turn it on. iCloud Drive syncs your Macs with nothing to set up, and Google Drive uses your own Google app, so no server of ours is ever involved. Either way, clips are encrypted before they leave your Mac.
+
+<br>
+
 ## Your AI tools can search it too
 
 A read-only MCP server lets tools like Claude search what you choose to share: nothing, your pinboards, or everything. They can't change your clips, and they never get text that looks like a secret.
@@ -165,6 +171,22 @@ Hover a clip for quick pin, copy and delete buttons, or right-click it for every
 - AI tools never get text that looks like a secret, and Clipboard never fetches a preview for a link that contains one.
 - Link previews are on by default, so copying a link contacts that site for its title, image and icon. Private addresses and links that look single-use, like password resets, are skipped, and you can turn previews off in Settings > Privacy.
 
+## Sync
+
+Sync is off by default. Choose where it goes in Settings > Sync:
+
+| Mode | Works between | Setup |
+| --- | --- | --- |
+| Off | Nothing leaves this Mac | None |
+| iCloud Drive | Your Macs | A passphrase |
+| Google Drive | Your Macs today, other platforms once they have a client | Your own free Google app, and a passphrase |
+
+Clips are encrypted with your passphrase before they leave the Mac, so neither Apple nor Google can read them, and nobody can recover the passphrase for you. Files, text that looks like a secret and clips over 25 MB never sync. Deleting a clip deletes it on your other devices too, but your retention setting only applies to the Mac it's set on.
+
+Google Drive uses a client you create yourself, because Clipboard has no servers and no Google app of its own. Settings walks you through it. It can only reach its own hidden folder in your Drive, not your files. Use the same client on every device, and click **Publish app** when you set it up, or Google signs you out every 7 days.
+
+iCloud sync here is a folder in iCloud Drive rather than Apple's CloudKit, which needs a paid developer account. The format is plain and documented in [docs/sync-format.md](docs/sync-format.md), so a client on another platform can join.
+
 ## AI tools
 
 `clipboard-mcp`, bundled inside the app, is a read-only [MCP](https://modelcontextprotocol.io) server. Sharing is off until you choose pinboards or your entire history in Settings > AI Tools, which also shows the setup for each tool:
@@ -175,7 +197,7 @@ claude mcp add clipboard -- ~/Applications/Clipboard.app/Contents/MacOS/clipboar
 
 ## Not included
 
-iPhone and iPad apps, iCloud sync and shared team pinboards are left out. Suggested uses local ranking in place of Apple Intelligence.
+iPhone and iPad apps and shared team pinboards are left out. Suggested uses local ranking in place of Apple Intelligence.
 
 <details>
 <summary><b>Development</b></summary>

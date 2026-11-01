@@ -60,6 +60,26 @@ public final class ClipStore: @unchecked Sendable {
         if version < 1 { try createTables() }
         if version < 2 { try addSecretFlag() }
         if version < 3 { try addLinkPreviewColumns() }
+        if version < 4 { try addSyncTables() }
+    }
+
+    private func addSyncTables() throws {
+        try db.transaction {
+            try db.script(
+                """
+                ALTER TABLE clips ADD COLUMN updated_at REAL NOT NULL DEFAULT 0;
+                UPDATE clips SET updated_at = created_at;
+                CREATE TABLE sync_objects(
+                    name TEXT PRIMARY KEY,
+                    hash TEXT NOT NULL,
+                    version TEXT NOT NULL,
+                    updated_at REAL NOT NULL
+                );
+                CREATE INDEX sync_objects_hash ON sync_objects(hash);
+                CREATE TABLE sync_deletions(hash TEXT PRIMARY KEY, deleted_at REAL NOT NULL);
+                PRAGMA user_version = 4;
+                """)
+        }
     }
 
     private func addLinkPreviewColumns() throws {
@@ -252,8 +272,8 @@ public final class ClipStore: @unchecked Sendable {
                         """
                         INSERT INTO clips(uuid, hash, kind, preview, body, text_length, search_text, source_bundle_id,
                             source_name, created_at, sort_at, byte_size, pixel_width, pixel_height, item_count,
-                            manifest, has_thumbnail, is_secret)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            manifest, has_thumbnail, is_secret, updated_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """,
                         [
                             .text(uuid), .text(draft.hash), .text(draft.kind.rawValue),
@@ -263,9 +283,11 @@ public final class ClipStore: @unchecked Sendable {
                             .real(now.timeIntervalSince1970), .int(draft.byteSize), .optional(draft.pixelWidth),
                             .optional(draft.pixelHeight), .int(Int64(draft.items.count)), .text(manifestJSON),
                             .int(draft.thumbnail != nil ? 1 : 0), .int(draft.isSecret ? 1 : 0),
+                            .real(now.timeIntervalSince1970),
                         ])
                     id = db.lastInsertID
                 }
+                try db.execute("DELETE FROM sync_deletions WHERE hash = ?", [.text(draft.hash)])
                 guard let clip = try clip(id: id) else {
                     throw DatabaseError(description: "Clip \(id) disappeared after saving")
                 }
@@ -485,8 +507,8 @@ public final class ClipStore: @unchecked Sendable {
         try locked {
             let cleaned = title?.trimmingCharacters(in: .whitespacesAndNewlines)
             try db.execute(
-                "UPDATE clips SET title = ? WHERE id = ?",
-                [.optional(cleaned?.isEmpty == true ? nil : cleaned), .int(clipID)])
+                "UPDATE clips SET title = ?, updated_at = ? WHERE id = ?",
+                [.optional(cleaned?.isEmpty == true ? nil : cleaned), .real(Date().timeIntervalSince1970), .int(clipID)])
             try refreshSearchText(clipID: clipID)
         }
     }
@@ -514,6 +536,12 @@ public final class ClipStore: @unchecked Sendable {
 
     public func delete(clipID: Int64) throws {
         try locked {
+            try db.execute(
+                """
+                INSERT OR REPLACE INTO sync_deletions(hash, deleted_at)
+                SELECT DISTINCT c.hash, ? FROM clips c JOIN sync_objects o ON o.hash = c.hash WHERE c.id = ?
+                """,
+                [.real(Date().timeIntervalSince1970), .int(clipID)])
             let uuid = try db.query("SELECT uuid FROM clips WHERE id = ?", [.int(clipID)]).first?.string("uuid")
             try db.execute("DELETE FROM clips WHERE id = ?", [.int(clipID)])
             if let uuid { try? fileManager.removeItem(at: blobDirectory(uuid)) }
@@ -530,8 +558,15 @@ public final class ClipStore: @unchecked Sendable {
     @discardableResult
     public func clearHistory(keepPinned: Bool) throws -> Int {
         try locked {
-            let removed = try deleteClips(
-                where: keepPinned ? "NOT EXISTS (SELECT 1 FROM pins WHERE pins.clip_id = clips.id)" : "1 = 1")
+            let condition = keepPinned ? "NOT EXISTS (SELECT 1 FROM pins WHERE pins.clip_id = clips.id)" : "1 = 1"
+            // Otherwise the next sync would bring everything straight back.
+            try db.execute(
+                """
+                INSERT OR REPLACE INTO sync_deletions(hash, deleted_at)
+                SELECT DISTINCT clips.hash, ? FROM clips JOIN sync_objects o ON o.hash = clips.hash WHERE \(condition)
+                """,
+                [.real(Date().timeIntervalSince1970)])
+            let removed = try deleteClips(where: condition)
             try db.script("PRAGMA wal_checkpoint(TRUNCATE)")
             return removed
         }
@@ -593,11 +628,22 @@ public final class ClipStore: @unchecked Sendable {
     public func updatePinboard(id: Int64, name: String, color: String) throws {
         try locked {
             try db.execute("UPDATE pinboards SET name = ?, color = ? WHERE id = ?", [.text(name), .text(color), .int(id)])
+            try touchClips(onBoard: id)
         }
     }
 
     public func deletePinboard(id: Int64) throws {
-        try locked { try db.execute("DELETE FROM pinboards WHERE id = ?", [.int(id)]) }
+        try locked {
+            try touchClips(onBoard: id)
+            try db.execute("DELETE FROM pinboards WHERE id = ?", [.int(id)])
+        }
+    }
+
+    // Each clip carries its boards by name, so a change to a board is a change to every clip on it.
+    private func touchClips(onBoard id: Int64) throws {
+        try db.execute(
+            "UPDATE clips SET updated_at = ? WHERE id IN (SELECT clip_id FROM pins WHERE pinboard_id = ?)",
+            [.real(Date().timeIntervalSince1970), .int(id)])
     }
 
     public func pin(clipID: Int64, pinboardID: Int64, at now: Date = Date()) throws {
@@ -605,12 +651,153 @@ public final class ClipStore: @unchecked Sendable {
             try db.execute(
                 "INSERT OR REPLACE INTO pins(pinboard_id, clip_id, pinned_at) VALUES (?, ?, ?)",
                 [.int(pinboardID), .int(clipID), .real(now.timeIntervalSince1970)])
+            try db.execute("UPDATE clips SET updated_at = ? WHERE id = ?", [.real(now.timeIntervalSince1970), .int(clipID)])
         }
     }
 
     public func unpin(clipID: Int64, pinboardID: Int64) throws {
         try locked {
             try db.execute("DELETE FROM pins WHERE pinboard_id = ? AND clip_id = ?", [.int(pinboardID), .int(clipID)])
+            try db.execute("UPDATE clips SET updated_at = ? WHERE id = ?", [.real(Date().timeIntervalSince1970), .int(clipID)])
+        }
+    }
+
+    // MARK: Sync
+
+    struct SyncCandidate {
+        let clip: Clip
+        let hash: String
+        let updatedAt: Double
+        let boards: [Pinboard]
+    }
+
+    /// Clips with changes to send, newest first. Files mean nothing on another device, and secrets never leave this one.
+    func syncCandidates(limit: Int, largest: Int64) throws -> [SyncCandidate] {
+        try locked {
+            let rows = try db.query(
+                """
+                SELECT \(Self.clipColumns), c.hash AS sync_hash, c.updated_at AS sync_updated_at
+                FROM clips c LEFT JOIN sync_objects o ON o.hash = c.hash AND o.name LIKE '%.clip'
+                WHERE c.kind != 'file' AND c.is_secret = 0 AND c.byte_size <= ?
+                    AND (o.hash IS NULL OR o.updated_at < c.updated_at)
+                ORDER BY c.sort_at DESC LIMIT ?
+                """,
+                [.int(largest), .int(Int64(limit))])
+            let boards = try pinboards()
+            return rows.compactMap { row in
+                guard let clip = makeClip(row), let hash = row.string("sync_hash") else { return nil }
+                return SyncCandidate(
+                    clip: clip, hash: hash, updatedAt: row.double("sync_updated_at") ?? 0,
+                    boards: boards.filter { clip.pinboardIDs.contains($0.id) })
+            }
+        }
+    }
+
+    func syncedVersions() throws -> [String: String] {
+        try locked {
+            var versions: [String: String] = [:]
+            for row in try db.query("SELECT name, version FROM sync_objects") {
+                if let name = row.string("name"), let version = row.string("version") { versions[name] = version }
+            }
+            return versions
+        }
+    }
+
+    func recordSyncedObject(name: String, hash: String, version: String, updatedAt: Double) throws {
+        try locked {
+            try db.execute(
+                "INSERT OR REPLACE INTO sync_objects(name, hash, version, updated_at) VALUES (?, ?, ?, ?)",
+                [.text(name), .text(hash), .text(version), .real(updatedAt)])
+        }
+    }
+
+    /// Whatever vanished from the cloud gets uploaded again if this device still has the clip.
+    func forgetSyncedObjects(notIn names: Set<String>) throws {
+        try locked {
+            for name in try syncedVersions().keys where !names.contains(name) {
+                try db.execute("DELETE FROM sync_objects WHERE name = ?", [.text(name)])
+            }
+        }
+    }
+
+    func syncLocalState(hash: String) throws -> (id: Int64, updatedAt: Double)? {
+        try locked {
+            guard let row = try db.query("SELECT id, updated_at FROM clips WHERE hash = ?", [.text(hash)]).first,
+                let id = row.int64("id")
+            else { return nil }
+            return (id, row.double("updated_at") ?? 0)
+        }
+    }
+
+    /// Removes a clip another device deleted, without recording a deletion of its own to send back.
+    func deleteSyncedClip(id: Int64) throws {
+        try locked {
+            let uuid = try db.query("SELECT uuid FROM clips WHERE id = ?", [.int(id)]).first?.string("uuid")
+            try db.execute("DELETE FROM clips WHERE id = ?", [.int(id)])
+            if let uuid { try? fileManager.removeItem(at: blobDirectory(uuid)) }
+        }
+    }
+
+    func applySyncedChanges(
+        clipID: Int64, title: String?, pinboards boards: [(name: String, color: String)], updatedAt: Double, sortedAt: Date?
+    ) throws {
+        try locked {
+            try db.execute("UPDATE clips SET title = ?, updated_at = ? WHERE id = ?", [.optional(title), .real(updatedAt), .int(clipID)])
+            if let sortedAt {
+                try db.execute(
+                    "UPDATE clips SET sort_at = MAX(sort_at, ?) WHERE id = ?", [.real(sortedAt.timeIntervalSince1970), .int(clipID)])
+            }
+            try refreshSearchText(clipID: clipID)
+            try setSyncedPins(clipID: clipID, boards: boards)
+        }
+    }
+
+    func finishSyncedCapture(
+        clipID: Int64, createdAt: Date?, title: String?, pinboards boards: [(name: String, color: String)], updatedAt: Double
+    ) throws {
+        try locked {
+            try db.execute(
+                "UPDATE clips SET title = ?, updated_at = ?, created_at = COALESCE(?, created_at) WHERE id = ?",
+                [.optional(title), .real(updatedAt), createdAt.map { .real($0.timeIntervalSince1970) } ?? .null, .int(clipID)])
+            try refreshSearchText(clipID: clipID)
+            try setSyncedPins(clipID: clipID, boards: boards)
+        }
+    }
+
+    private func setSyncedPins(clipID: Int64, boards: [(name: String, color: String)]) throws {
+        try db.execute("DELETE FROM pins WHERE clip_id = ?", [.int(clipID)])
+        let existing = try pinboards()
+        for board in boards {
+            let id = try existing.first { $0.name == board.name }?.id ?? createPinboard(name: board.name, color: board.color).id
+            try db.execute(
+                "INSERT OR REPLACE INTO pins(pinboard_id, clip_id, pinned_at) VALUES (?, ?, ?)",
+                [.int(id), .int(clipID), .real(Date().timeIntervalSince1970)])
+        }
+    }
+
+    func pendingSyncDeletions() throws -> [(hash: String, deletedAt: Double)] {
+        try locked {
+            try db.query("SELECT hash, deleted_at FROM sync_deletions ORDER BY deleted_at DESC").compactMap { row in
+                guard let hash = row.string("hash"), let deletedAt = row.double("deleted_at") else { return nil }
+                return (hash, deletedAt)
+            }
+        }
+    }
+
+    func pendingSyncDeletion(hash: String) throws -> Double? {
+        try locked {
+            try db.query("SELECT deleted_at FROM sync_deletions WHERE hash = ?", [.text(hash)]).first?.double("deleted_at")
+        }
+    }
+
+    func finishSyncDeletion(hash: String) throws {
+        try locked { try db.execute("DELETE FROM sync_deletions WHERE hash = ?", [.text(hash)]) }
+    }
+
+    /// For switching where clips sync to, since nothing recorded here is true of the new place.
+    public func resetSyncState() throws {
+        try locked {
+            try db.script("DELETE FROM sync_objects; DELETE FROM sync_deletions;")
         }
     }
 

@@ -157,7 +157,7 @@ import Testing
         let temp = try TemporaryStore()
         let saved = try temp.add("https://example.com/")
         let database = try Database(path: temp.directory.appendingPathComponent("history.sqlite").path, readOnly: false)
-        try database.script("ALTER TABLE clips DROP COLUMN has_icon; ALTER TABLE clips DROP COLUMN link_checked; PRAGMA user_version = 2")
+        try database.script("ALTER TABLE clips DROP COLUMN has_icon; ALTER TABLE clips DROP COLUMN link_checked; ALTER TABLE clips DROP COLUMN updated_at; DROP TABLE sync_objects; DROP TABLE sync_deletions; PRAGMA user_version = 2")
 
         let upgraded = try ClipStore(directory: temp.directory)
         #expect(try upgraded.clip(id: saved.id)?.hasIcon == false)

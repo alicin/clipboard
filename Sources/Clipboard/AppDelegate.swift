@@ -13,6 +13,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var stack: StackController!
     private var panel: PanelController!
     private var settings: SettingsWindowController!
+    private var sync: SyncController!
     private var statusItem: NSStatusItem!
     private var maintenanceTimer: Timer?
     private var statusFlash: DispatchWorkItem?
@@ -56,7 +57,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         coordinator = PasteCoordinator(store: store, writer: writer, preferences: preferences, toast: toast)
         stack = StackController(writer: writer, toast: toast)
         coordinator.stack = stack
-        settings = SettingsWindowController(store: store)
+        sync = SyncController(store: store, preferences: preferences) { [weak self] result in
+            self?.enricher.process(result)
+        }
+        settings = SettingsWindowController(store: store, sync: sync)
         monitor = ClipboardMonitor(store: store, writer: writer, preferences: preferences)
         monitor.onCapture = { [weak self] result in
             guard let self else { return }
@@ -113,6 +117,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         monitor.start()
         runMaintenance()
         enricher.fetchMissingLinkPreviews()
+        sync.start()
 
         let timer = Timer(timeInterval: 3600, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.runMaintenance() }
@@ -130,7 +135,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             }
         }
         #if DEBUG
-        testControl = TestControl(panel: panel, stack: stack, settings: settings)
+        testControl = TestControl(panel: panel, stack: stack, settings: settings, sync: sync)
         testControl?.start()
         #endif
     }

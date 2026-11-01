@@ -37,6 +37,7 @@ app = pathlib.Path(options.app).resolve() if options.app else ROOT / "build/Clip
 
 work = pathlib.Path(tempfile.mkdtemp(prefix="paste-ui-test-"))
 data = work / "data"
+sync_folder = work / "sync"
 state_file = data / "test-state.json"
 environment = {**os.environ, "PB_NAME": PASTEBOARD, "DEVELOPER_DIR": "/Applications/Xcode.app/Contents/Developer"}
 failures = []
@@ -61,6 +62,14 @@ def ctl(*command):
 def copy(kind, *values, settle=0.55):
     tool(kind, *values)
     time.sleep(settle)
+
+
+def copy_and_wait(kind, *values):
+    count = clip_count()
+    copy(kind, *values)
+    deadline = time.time() + 5
+    while clip_count() == count and time.time() < deadline:
+        time.sleep(0.1)
 
 
 def key(code, *modifiers, character=""):
@@ -108,7 +117,7 @@ subprocess.run(
 copy("text", "seed", settle=0)
 subprocess.run(
     ["open", "-g", "-n", "--env", f"CLIPBOARD_DATA_DIR={data}", "--env", f"CLIPBOARD_TEST_PASTEBOARD={PASTEBOARD}",
-     str(app)], check=True,
+     "--env", f"CLIPBOARD_TEST_SYNC_FOLDER={sync_folder}", str(app)], check=True,
 )
 time.sleep(1.5)
 
@@ -433,7 +442,7 @@ try:
     moving = work / "moving.gif"
     tool("make-gif", moving)
 
-    copy("files", ROOT / "demo-assets/demo.mp4")
+    copy_and_wait("files", ROOT / "demo-assets/demo.mp4")
     ctl("show")
     time.sleep(0.3)
     state = key(SPACE)
@@ -448,7 +457,7 @@ try:
     check("closing the preview stops the video", not state["previewPlayer"]["exists"], state["previewPlayer"])
     ctl("hide")
 
-    copy("files", silence)
+    copy_and_wait("files", silence)
     ctl("show")
     time.sleep(0.3)
     key(SPACE)
@@ -465,14 +474,14 @@ try:
     time.sleep(0.4)
     ctl("hide")
 
-    copy("files", moving)
+    copy_and_wait("files", moving)
     ctl("show")
     time.sleep(0.3)
     before = ctl("state")["previewFramesShown"]
     key(SPACE)
     time.sleep(1.2)
     state = ctl("state")
-    check("Space animates a GIF file", state["previewFramesShown"] - before >= 3, state["previewFramesShown"] - before)
+    check("Space animates a GIF file", state["previewFramesShown"] - before >= 3, (state["previewFramesShown"] - before, state["isPreviewing"], state["selectedPreview"][-24:], state["previewPlayer"]))
     key(ESCAPE)
     time.sleep(0.4)
     settled = ctl("state")["previewFramesShown"]
@@ -480,7 +489,7 @@ try:
     check("closing the preview stops the animation", ctl("state")["previewFramesShown"] == settled)
     ctl("hide")
 
-    copy("gif-data", moving)
+    copy_and_wait("gif-data", moving)
     ctl("show")
     time.sleep(0.3)
     before = ctl("state")["previewFramesShown"]
@@ -491,6 +500,46 @@ try:
     key(ESCAPE)
     time.sleep(0.4)
     ctl("hide")
+
+    print("\n# Sync")
+    sync_folder_files = lambda: sorted(path.name for path in sync_folder.glob("*"))
+    state = ctl("state")
+    check("sync starts off", state["syncStatus"] == "off", state["syncStatus"])
+    check("nothing is written while it's off", not sync_folder.exists() or not sync_folder_files(), sync_folder_files() if sync_folder.exists() else [])
+    ctl("settings")
+    ctl("settings-page", "sync")
+    time.sleep(0.4)
+    screenshot("settings-sync-off", 790, 805)
+    ctl("sync-mode", "googleDrive")
+    time.sleep(0.4)
+    state = ctl("state")
+    check("Google Drive asks for your own app first", state["syncStatus"] == "needsGoogleApp", state["syncStatus"])
+    screenshot("settings-sync-google", 790, 805)
+    ctl("sync-mode", "iCloud")
+    time.sleep(0.4)
+    state = ctl("state")
+    check("iCloud asks for a passphrase", state["syncStatus"] == "needsPassphrase", state["syncStatus"])
+    screenshot("settings-sync-passphrase", 790, 805)
+    ctl("sync-passphrase", "correct horse")
+    deadline = time.time() + 20
+    while time.time() < deadline:
+        state = ctl("state")
+        if state["syncStatus"] == "upToDate" and state["syncLastSynced"]:
+            break
+        time.sleep(0.5)
+    check("a passphrase turns sync on", state["syncStatus"] == "upToDate" and state["syncLastSynced"], state["syncStatus"])
+    time.sleep(0.5)
+    screenshot("settings-sync-on", 790, 805)
+    names = sync_folder_files()
+    check("clips reach the folder", "sync-info.json" in names and any(name.endswith(".clip") for name in names), names)
+    check("the secret stays out", clip_count() > sum(name.endswith(".clip") for name in names), names)
+    contents = b"".join((sync_folder / name).read_bytes() for name in names if name != "sync-info.json")
+    check("nothing in the folder is readable", b"oat milk" not in contents and b"Bakery" not in contents and b"ghp_" not in contents)
+    ctl("sync-mode", "off")
+    time.sleep(0.3)
+    ctl("settings-page", "general")
+    ctl("settings-close")
+    time.sleep(0.5)
 
     print("\n# AI tools helper")
     helper = app / "Contents/MacOS/clipboard-mcp"
