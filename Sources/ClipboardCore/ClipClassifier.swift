@@ -85,6 +85,7 @@ public enum SecretDetector {
         #"\bAKIA[0-9A-Z]{16}\b"#,
         #"\bxox[abeprs]-[A-Za-z0-9-]{10,}"#,
         #"\bAIza[0-9A-Za-z_-]{35}\b"#,
+        #"\bGOCSPX-[0-9A-Za-z_-]{20,}"#,
         #"\b[sr]k_live_[0-9A-Za-z]{16,}"#,
         #"\bnpm_[A-Za-z0-9]{30,}"#,
         #"-----BEGIN [A-Z ]*PRIVATE KEY-----"#,

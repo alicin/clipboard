@@ -3,6 +3,19 @@ import Testing
 @testable import ClipboardCore
 
 @Suite struct ClassifierTests {
+    // Assembled here so the source doesn't hold anything GitHub's secret scanning would stop a push over.
+    @Test func googleClientSecretsAreDetected() throws {
+        let secret = "GOCSPX" + "-" + String(repeating: "aB3_", count: 7)
+        #expect(SecretDetector.containsSecret(secret))
+        #expect(SecretDetector.containsSecret("CLIENT_SECRET=\(secret)"))
+        #expect(!SecretDetector.containsSecret("GOCSPX is a prefix Google uses"))
+        guard case .skippedSecret = ClipBuilder.build(items: [[utf8Rep(secret)]], source: ClipSource(bundleID: nil, name: nil), secrets: .skip) else {
+            Issue.record("expected the secret to be skipped")
+            return
+        }
+        #expect(try #require(draft(from: [[utf8Rep(secret)]], secrets: .show)).isSecret)
+    }
+
     @Test(arguments: [
         "https://example.com", "http://example.com/a?b=c", "www.example.org", "mailto:ali@example.com",
         "  https://example.com/trailing-space \n",
