@@ -83,6 +83,7 @@ final class DemoScript {
     }
 
     private func caption(_ title: String, _ detail: String) {
+        print("demo: caption \(engine.writtenFrames) \(title)")
         withAnimation(Motion.bouncy) { world.caption = DemoWorld.Caption(title: title, detail: detail) }
     }
 
@@ -414,6 +415,12 @@ final class DemoScript {
         caption("Files", "Live thumbnails, ready to paste or drag anywhere.")
         await wait(2.3)
         engine.snap("tour-file")
+        press(["→"], hold: 0.5)
+        model.moveSelection(by: 1)
+        follow(7)
+        caption("Secrets stay hidden", "Keys and tokens show as dots, and still paste in full.")
+        await wait(2.3)
+        engine.snap("tour-secret")
         press(["⌘", "←"], hold: 0.7)
         model.selectFirst()
         lookAtStrip()
@@ -832,14 +839,20 @@ final class DemoScript {
         }
         await wait(1.2)
 
-        caption("Your clipboard stays yours", "Stored only on this Mac. Skip apps and secrets, or pause anytime.")
+        caption("Your clipboard stays yours", "Stored only on this Mac. Skip apps, hide secrets, or pause anytime.")
         look(at: CGPoint(x: 800, y: 420), zoom: 1.28)
         await clickAt(CGPoint(x: sidebarX, y: rowY(2)), duration: 0.6)
         withAnimation(Motion.snappy) { navigation.page = .privacy }
-        await wait(2.2)
+        await wait(1.4)
         engine.snap("settings-privacy")
+        look(at: CGPoint(x: frame.minX + 540, y: frame.minY + 215), zoom: 2.0)
+        await wait(0.5)
+        await clickAt(CGPoint(x: frame.minX + 676, y: frame.minY + 217))
+        withAnimation(Motion.snappy) { Preferences.shared.secretHandling = .hide }
+        await wait(1.6)
+        engine.snap("settings-secrets")
         look(at: CGPoint(x: frame.minX + 540, y: frame.maxY - 150), zoom: 1.9)
-        withAnimation(.smooth(duration: 0.8)) { DemoControl.shared.settingsScrollOffset = 170 }
+        withAnimation(.smooth(duration: 0.8)) { DemoControl.shared.settingsScrollOffset = 206 }
         await wait(1.1)
         await clickAt(CGPoint(x: 1126, y: 629))
         withAnimation(Motion.snappy) { DemoControl.shared.confirmDeleteHistory = true }

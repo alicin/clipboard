@@ -25,7 +25,7 @@ enum DemoSeed {
     static func capture(_ reps: [[Representation]], app: String, name: String, store: ClipStore, minutesAgo: Double) -> Clip? {
         guard
             case .clip(let draft) = ClipBuilder.build(
-                items: reps, source: ClipSource(bundleID: app, name: name), secrets: .skip),
+                items: reps, source: ClipSource(bundleID: app, name: name), secrets: .hide),
             let result = try? store.capture(draft, at: Date().addingTimeInterval(-minutesAgo * 60))
         else { return nil }
         return result.clip
@@ -143,6 +143,7 @@ enum DemoSeed {
             try? store.setOCRText(words, clipID: image.id)
         }
         _ = capture([file(beansFile)], app: "com.apple.finder", name: "Finder", store: store, minutesAgo: 150)
+        _ = captureText("export GITHUB_TOKEN=ghp_abcdefghijklmnopqrstuvwxyz0123456789", app: "com.apple.Terminal", name: "Terminal", store: store, minutesAgo: 130)
         _ = capture([file(records)], app: "com.apple.finder", name: "Finder", store: store, minutesAgo: 120)
         _ = captureText("#FFB3C1", app: "com.pixelmatorteam.pixelmator.x", name: "Pixelmator Pro", store: store, minutesAgo: 60)
         let code = captureText(
